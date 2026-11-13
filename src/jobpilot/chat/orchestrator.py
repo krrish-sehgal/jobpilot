@@ -12,6 +12,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
+from jobpilot.agent.events import EventHook
 from jobpilot.agent.loop import AgentLoop
 from jobpilot.agent.tools import AgentToolContext
 from jobpilot.chat.ledger import DeliveryLedger
@@ -44,13 +45,22 @@ class TurnOrchestrator:
         self._clock = clock
 
     def process_turn(
-        self, conversation_id: UUID, message_id: UUID, ctx: AgentToolContext
+        self,
+        conversation_id: UUID,
+        message_id: UUID,
+        ctx: AgentToolContext,
+        *,
+        on_event: EventHook | None = None,
     ) -> str | None:
         """Process one pending inbound message end to end.
 
         Returns the reply text that was recorded for delivery, or
         `None` if this worker lost the race to claim the lease (which
         is the expected, non-error outcome of a double-delivery).
+
+        `on_event` is forwarded to the agent loop so a caller that
+        streams progress (the web channel) sees tool calls as they
+        happen. The webhook channel omits it.
         """
 
         now = self._clock()
@@ -71,7 +81,12 @@ class TurnOrchestrator:
             message = self._messages.get(message_id)
             self._messages.update_status(message_id, MessageStatus.PROCESSING)
 
-            turn = self._agent_loop.run(ctx, message.body)
+            # Only pass the hook when there is one, so a custom loop that
+            # predates the hook keeps working unchanged.
+            if on_event is None:
+                turn = self._agent_loop.run(ctx, message.body)
+            else:
+                turn = self._agent_loop.run(ctx, message.body, on_event=on_event)
             reply_text = turn.final_reply or ""
 
             idempotency_key = f"{conversation_id}:{message_id}"

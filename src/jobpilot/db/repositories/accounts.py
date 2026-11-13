@@ -114,10 +114,15 @@ class AuthCodeRepository:
         return AuthCode.model_validate(row)
 
     def list_for_email(self, email: str) -> list[AuthCode]:
-        """All codes for `email`, newest first."""
+        """All codes for `email`, newest first.
+
+        Sorted ascending then reversed (rather than `reverse=True`) so
+        that codes with identical timestamps keep insertion order and
+        the later insert counts as newer.
+        """
 
         codes = [AuthCode.model_validate(r) for r in self._db.find(_AUTH_CODES, email=email)]
-        return sorted(codes, key=lambda c: c.created_at, reverse=True)
+        return list(reversed(sorted(codes, key=lambda c: c.created_at)))
 
     def latest_active(self, email: str) -> AuthCode | None:
         """The newest code that has not been consumed, or `None`.

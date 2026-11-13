@@ -8,6 +8,7 @@ focused on reasoning rather than formatting.
 from __future__ import annotations
 
 from collections.abc import Collection
+from datetime import UTC, datetime
 
 from jobpilot.models import LocationTier, ScoredJob, SeniorityBand
 
@@ -24,6 +25,17 @@ _TIER_LABELS = {
 class JobCard(dict):
     """A dict subclass so cards serialize trivially, with typed fields
     documented here for readability."""
+
+
+def _iso_utc(moment: datetime | None) -> str | None:
+    """ISO-8601 in UTC with a `Z` suffix, matching how the API serialises
+    every other timestamp (`docs/web-api.md`)."""
+
+    if moment is None:
+        return None
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=UTC)
+    return moment.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 def match_reasons(
@@ -102,7 +114,7 @@ def render_job_card(
             candidate_seniority=candidate_seniority,
             preferred_location_tiers=preferred_location_tiers,
         ),
-        posted_at=job.posted_at.isoformat() if job.posted_at else None,
+        posted_at=_iso_utc(job.posted_at),
         is_saved=str(job.id) in saved_job_ids,
     )
 
