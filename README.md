@@ -14,6 +14,8 @@ jobpilot/
   src/jobpilot/
     agent/          agentic loop: tool registry, tools, prompts, turn budget
     chat/            inbound webhook, claim-and-lease orchestration, outbound ledger, cards
+    web/             HTTP API for the website: email-code auth, SSE chat, jobs, resumes, tailoring
+    resume/          resume parsing, keyword scoring, tailoring suggestions + fabrication guard
     memory/          background fact extraction + semantic recall
     ingest/          scrapers, dedup, checkpointing, queue consumer, LLM enrichment
     search/          embeddings, hybrid retrieval, the ranking engine
@@ -27,9 +29,9 @@ jobpilot/
 
 ## The core ideas
 
-1. **Agentic loop, not a single generation.** The agent has four
+1. **Agentic loop, not a single generation.** The agent has five
    tools — `search_jobs`, `recall_memory`, `fetch_resume`,
-   `get_job_details` — and decides which to call, looks at the
+   `get_job_details`, `tailor_resume` — and decides which to call, looks at the
    result, and decides again, bounded by a turn budget so it always
    terminates. See `src/jobpilot/agent/loop.py`.
 2. **Durable conversations.** An inbound message is persisted before
@@ -69,6 +71,14 @@ jobpilot/
    location fit, and posting completeness — combine into a single
    ranked score (`search/ranking.py`).
 
+8. **Honest resume tailoring.** The website lets a user upload a
+   resume and get suggested edits for a specific job, each accepted or
+   rejected individually. A language model proposes the edits, but a
+   deterministic fabrication guard (`resume/guard.py`) throws away any
+   suggestion that adds a number, employer, title, date or skill the
+   resume does not already support, and a pure scoring function
+   (`resume/scoring.py`) reports the match score before and after.
+
 ## Local setup
 
 ```bash
@@ -91,7 +101,64 @@ against live infrastructure.
 make lint      # ruff
 make test      # pytest
 make run       # start the webhook service (needs a real database configured)
+make run-web   # start the web API for the website on :8001
 ```
+
+## Web service
+
+`src/jobpilot/web/` is the HTTP API the website talks to; the contract
+(paths, payloads, stream events, error shape) is
+[`docs/web-api.md`](docs/web-api.md) and the code follows it exactly.
+
+- **Auth:** email one-time code (six digits, hashed at rest, ten-minute
+  expiry, five attempts) exchanged for an HMAC-signed bearer token. No
+  password and no new dependency (`web/auth.py`).
+- **Chat:** `POST` a message (idempotent on `client_message_id`), then
+  open the turn's SSE stream. Events: `status`, `tool_call`,
+  `tool_result`, `token`, `job_cards`, `tailoring_started`, `done`,
+  `error`. The turn runs through the same claim-and-lease orchestrator
+  as the webhook channel.
+- **Jobs, resumes, tailoring:** job detail, save/unsave, upload (PDF or
+  DOCX, 5 MB), choose a primary resume, start a tailoring for a job or
+  a pasted description, accept or reject suggestions, export PDF or DOCX.
+- **Errors:** every non-2xx response is
+  `{"error": {"code", "message"}}`.
+
+Web settings: `JOBPILOT_WEB_ALLOWED_ORIGINS` (comma-separated CORS
+origins), `JOBPILOT_AUTH_TOKEN_SECRET` (must be set outside
+development; the app refuses to start with the placeholder),
+`JOBPILOT_AUTH_TOKEN_TTL_HOURS`, `JOBPILOT_RESUME_MAX_BYTES`. With
+placeholder credentials in a development environment, `make run-web`
+falls back to the in-memory database and storage and the fake LLM, so it
+starts without infrastructure (resume parsing and chat replies need a
+real model, since the fake returns canned text). Sign-in codes are
+written to the log instead of emailed outside production.
+
+## Resume tailoring
+
+`src/jobpilot/resume/` is the feature behind the website's resume
+screen and the agent's `tailor_resume` tool.
+
+1. **Upload.** PDF or DOCX is validated by content (magic bytes), not
+   file name, and capped at 5 MB. Text extraction is behind a
+   `TextExtractor` protocol; a deployment plugs in pdfminer and
+   python-docx, and a dependency-free stub is used in tests.
+2. **Parse.** One LLM call with a strict JSON prompt, validated by
+   pydantic, with stable ids on every bullet.
+3. **Score.** A deterministic 0-100 match against the job: required
+   keyword coverage, preferred coverage, seniority fit, and recency of
+   relevant experience. Keywords are normalised (`js` is `javascript`).
+4. **Suggest and guard.** The model proposes bullet and summary
+   rewrites, skills to list, and section reorders. Anything introducing
+   facts not in the resume is rejected by the fabrication guard before
+   the user sees it; `add_skill` is allowed only for skills the resume
+   demonstrates elsewhere.
+5. **Decide and export.** Accepted suggestions are applied to a copy of
+   the resume and rendered as ATS-friendly single-column HTML, PDF or
+   DOCX behind a `DocumentRenderer` protocol.
+
+Design notes, including what the guard does and does not catch, are in
+[`docs/architecture.md`](docs/architecture.md).
 
 ## Configuration
 
@@ -108,7 +175,9 @@ In brief: `users`, `jobs` (with the taxonomy columns and a pgvector
 embedding of `candidate_profile_text`), `messages` / `conversations`
 / `turn_leases` / `outbound_deliveries` for the chat pipeline,
 `user_facts` for memory, `ingest_checkpoints` for resumable scraping,
-and `match_scores` for persisted ranking output.
+`match_scores` for persisted ranking output, and (migration 0003) `resumes`,
+`tailorings`, `tailoring_suggestions`, `saved_jobs` and `auth_codes` for
+the web service.
 
 ## Testing
 
@@ -122,7 +191,12 @@ filtering, content-hash dedup, retry/backoff jitter bounds, the token
 bucket, text chunking, enrichment schema validation, the tool
 registry's argument validation, the agent loop's turn budget, the
 orchestrator's claim-and-lease behavior, and the delivery ledger's
-idempotency guarantee.
+idempotency guarantee. The web and resume features add tests for
+keyword normalisation and coverage, match scoring, the fabrication guard
+(accept and reject cases), applying decisions, sign-in code expiry and
+attempt limits, tampered-token rejection, SSE formatting, idempotent
+`client_message_id`, and every route through a `TestClient` over the
+in-memory fakes.
 
 ## Deployment notes
 

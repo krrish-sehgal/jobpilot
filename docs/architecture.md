@@ -12,7 +12,9 @@ JobPilot has three pipelines that meet at the `jobs` table:
    ranked list of matches.
 3. **Chat** — an inbound webhook durably records messages, a
    claim-and-lease orchestrator runs the agentic loop exactly once per
-   turn, and an idempotent delivery ledger sends the reply.
+   turn, and an idempotent delivery ledger sends the reply. The web
+   service is a second front door onto the same orchestrator, and adds
+   resume tailoring (see below).
 
 ```
                  ┌──────────────┐
@@ -25,7 +27,8 @@ JobPilot has three pipelines that meet at the `jobs` table:
  Webhook ──▶ messages table ──▶ Orchestrator (claim-and-lease) ──▶ Agent loop ──▶ Delivery ledger
                                                                         │
                                                               tools: search_jobs, recall_memory,
-                                                              fetch_resume, get_job_details
+                                                              fetch_resume, get_job_details,
+                                                              tailor_resume
                                                                         │
                                                                  Hybrid search + ranking
                                                                     (reads jobs table)
@@ -174,6 +177,88 @@ constraint, preference, goal) using the extraction prompt's explicit
 distinction between "durable fact about the user" and "instruction or
 in-the-moment statement." `memory/store.py:MemoryStore` embeds facts
 at write time and retrieves by cosine similarity at read time
-(`recall_memory`, one of the agent's four tools), so a query like
+(`recall_memory`, one of the agent's five tools), so a query like
 "individual contributor roles" can surface a stored fact like "wants
 to stay hands-on technical" without keyword overlap.
+
+## Resume tailoring and the fabrication guard
+
+`resume/` turns an uploaded resume and a job into a short list of
+suggested edits the user accepts or rejects one at a time. The pipeline
+(`resume/tailor.py`) is deliberately split so the one part that needs a
+language model is the part least trusted:
+
+1. **Parse** (`parser.py`). One LLM call turns the extracted text into
+   `ResumeSections`, validated by pydantic. Bullets get deterministic
+   ids (a UUIDv5 of position and text) so re-parsing the same text gives
+   the same ids. Upload validation (`extract.py`) trusts file content,
+   not names: `%PDF-` magic bytes, or a zip that really contains
+   `word/document.xml`, under a 5 MB limit. Real text extraction sits
+   behind a `TextExtractor` protocol (pdfminer / python-docx in a real
+   deployment).
+2. **Keywords** (`keywords.py`). Required and preferred terms come from
+   the job's structured `skills` plus an LLM read of the description,
+   normalised to one canonical form (`js` is `javascript`, `k8s` is
+   `kubernetes`) with alias-aware matching and word boundaries.
+3. **Suggest** (`tailor.py`). The LLM proposes `rewrite_bullet`,
+   `rewrite_summary`, `add_skill` and `reorder_section` edits. The
+   prompt asks for honesty, but safety does not depend on it.
+4. **Guard** (`guard.py`). Every suggestion is machine-checked against
+   the original resume and dropped if it adds a fact the resume does not
+   contain: a number or date not in the text being rewritten, a
+   capitalised name that appears nowhere in the resume, a job-title word
+   the resume never uses, a job keyword the resume never mentions, or an
+   `add_skill` for a skill the resume does not *demonstrate* in a bullet,
+   project or summary (merely listing it elsewhere is not evidence). The
+   guard is intentionally blunt: it would rather discard a harmless
+   rewrite than let an invented employer through. It cannot tell that
+   "contributed to" became "led"; that judgement stays with the user,
+   who accepts every change.
+5. **Score** (`scoring.py`). A deterministic 0-100 score: required
+   keyword coverage (0.55), preferred coverage (0.15), seniority fit
+   (0.15, using `SENIORITY_ORDER`, asymmetric: overqualified costs less
+   than a stretch), and recency of relevant experience (0.15). A keyword
+   counts fully when it is listed (skills, summary, project tech) and
+   half when it is only mentioned in a bullet, which is why promoting a
+   demonstrated skill with `add_skill` raises the score. `score_before`
+   scores the original resume; `score_after` scores it with every
+   surviving, not-rejected suggestion applied, and is recomputed when the
+   user decides.
+
+Because the score and the guard are pure functions of the resume text,
+both are fully unit-tested without a model.
+
+## The streaming web turn
+
+The website talks to `web/` (contract: `docs/web-api.md`). A chat turn
+is two requests, so persistence never waits on a model:
+
+1. `POST /conversations/{id}/messages` writes the user message and
+   returns `{message_id, turn_id}`. It is idempotent on the browser's
+   `client_message_id` (a partial unique index backs the application
+   check), so a double click or retry returns the original ids and never
+   a second turn.
+2. `GET .../turns/{turn_id}/stream` returns server-sent events. The
+   handler validates ownership first, so a bad id is an ordinary JSON
+   404, then streams `web/streaming.py:TurnStreamer`.
+
+The turn runs on a worker thread through the existing `TurnOrchestrator`,
+so the lease and delivery-ledger guarantees above still hold. The agent
+loop accepts an optional `on_event` callback and reports `status`,
+`tool_call` and `tool_result` as it goes; the webhook channel passes none
+and behaves exactly as before. The worker, not the HTTP connection,
+persists the assistant message, so a closed tab does not lose the reply
+and reconnecting to a finished turn replays it from storage instead of
+running the agent twice. A turn that is mid-flight on another worker
+answers with a retryable `turn_in_progress` error.
+
+The model client returns a whole reply, so `token` events are produced by
+chunking the final text. A provider with native streaming would forward
+its deltas through the same events and the wire format would not change.
+UI-ready results (full job cards, a started tailoring) are collected on
+the tool context as tools run (`TurnArtifacts`) rather than echoed
+through the model, which keeps tool results small and cards exact.
+
+Sign-in is an emailed six-digit code, stored only as a keyed hash, valid
+for ten minutes and five guesses, exchanged for an HMAC-signed bearer
+token (`web/auth.py`); the reasoning is in that module's docstring.

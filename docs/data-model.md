@@ -107,6 +107,24 @@ activated, with a `check` constraint enforcing the five weights sum to
 1.0. Exists so a weight change can be attributed to a specific
 rollout rather than silently drifting via an unlogged config edit.
 
+## Web service tables (migration 0003)
+
+- `users` gains `email` (unique, case-insensitive, only where set),
+  `seniority_band`, and `preferred_location_tiers`; webhook-only users
+  are unaffected.
+- `auth_codes`: one-time sign-in codes as a keyed hash, with an expiry
+  and an attempt counter.
+- `resumes`: one row per upload, with raw text and parsed `sections`
+  (jsonb). A partial unique index allows at most one `is_primary` per
+  user.
+- `tailorings` and `tailoring_suggestions`: a tailoring is a header
+  (job, scores, keywords) plus ordered suggestions, each with a
+  `pending | accepted | rejected` decision.
+- `saved_jobs`: unique per `(user_id, job_id)`.
+- `conversations` gains `title` and `updated_at`; `messages` gains
+  `client_message_id` (unique per conversation where set, which makes
+  browser retries idempotent), `turn_id`, `job_cards` and `tailoring_id`.
+
 ## Migration order
 
 1. `0001_initial.sql` — `users`, `jobs`, `ingest_checkpoints`,
@@ -114,6 +132,9 @@ rollout rather than silently drifting via an unlogged config edit.
    `outbound_deliveries`, `user_facts`.
 2. `0002_add_match_scores.sql` — `match_scores`,
    `ranking_weight_versions`.
+3. `0003_resumes_and_tailorings.sql` — email accounts, `auth_codes`,
+   `resumes`, `tailorings`, `tailoring_suggestions`, `saved_jobs`, and
+   web columns on `conversations` and `messages`.
 
 Migrations are additive only: a later migration may add tables,
 columns, or indexes, but should not drop or rename a column another

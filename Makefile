@@ -1,4 +1,4 @@
-.PHONY: install lint format test run coverage
+.PHONY: install lint format test run run-web coverage
 
 install:
 	pip install -e ".[dev]"
@@ -18,3 +18,6 @@ coverage:
 
 run:
 	uvicorn jobpilot.chat.webhook:create_app --factory --reload --port 8000
+
+run-web:
+	uvicorn jobpilot.web.app:create_web_app --factory --reload --port 8001
