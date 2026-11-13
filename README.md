@@ -27,6 +27,8 @@ jobpilot/
   tests/              unit tests against the pure logic and the fakes
 ```
 
+The website (chat + resume tailoring, with a no-backend mock mode) lives in [`web/`](web/README.md); its API contract is [`docs/web-api.md`](docs/web-api.md).
+
 ## The core ideas
 
 1. **Agentic loop, not a single generation.** The agent has five
