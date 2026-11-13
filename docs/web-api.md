@@ -130,6 +130,16 @@ type Suggestion = { id: string; kind: "rewrite_bullet" | "rewrite_summary" | "ad
   decision: "pending" | "accepted" | "rejected" }
 ```
 
+Suggestion semantics:
+
+- `rewrite_bullet`: `target_id` is the bullet id (experience or project bullet); `proposed` replaces its text.
+- `rewrite_summary`: `target_id` is null; `proposed` is the full new summary.
+- `add_skill`: `target_id` is null; `proposed` is one skill appended to `skills`.
+- `reorder_section`: `section` is `"skills"` or `"projects"`, `target_id` equals that section name, and
+  `proposed` is the same items (skill names or project names), comma-separated, most relevant first.
+- `score_after` is the projected score with every suggestion that is not `rejected` applied;
+  it is recomputed whenever decisions change.
+
 ## Errors
 
 Any non-2xx response has the body `{ "error": { "code": string, "message": string } }`.
