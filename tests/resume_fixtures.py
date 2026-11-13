@@ -91,3 +91,38 @@ def make_docx(paragraphs: list[str] | None = None) -> bytes:
     with zipfile.ZipFile(buffer, "w") as archive:
         archive.writestr("word/document.xml", xml)
     return buffer.getvalue()
+
+
+def scripted_llm(
+    *,
+    parse_reply: str | None = None,
+    keywords: dict | None = None,
+    suggestions: list[dict] | None = None,
+):
+    """A `FakeLLMClient` that answers each resume prompt with a fixed reply.
+
+    Dispatch is by system-prompt identity, so a test states exactly what
+    each step of the pipeline "sees" from the model.
+    """
+
+    from jobpilot.integrations.llm import FakeLLMClient
+    from jobpilot.resume.prompts import (
+        KEYWORD_SYSTEM_PROMPT,
+        PARSE_SYSTEM_PROMPT,
+        TAILOR_SYSTEM_PROMPT,
+    )
+
+    replies = {
+        PARSE_SYSTEM_PROMPT: parse_reply if parse_reply is not None else sample_resume_json(),
+        KEYWORD_SYSTEM_PROMPT: json.dumps(
+            keywords
+            if keywords is not None
+            else {"job_title": None, "company": None, "required": ["python"], "preferred": []}
+        ),
+        TAILOR_SYSTEM_PROMPT: json.dumps({"suggestions": suggestions or []}),
+    }
+
+    def responder(system_prompt, messages):
+        return {"content": replies[system_prompt], "tool_calls": [], "finish_reason": "stop"}
+
+    return FakeLLMClient(responder=responder)
