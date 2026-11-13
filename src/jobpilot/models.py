@@ -351,6 +351,53 @@ class Message(BaseModel):
     status: MessageStatus = MessageStatus.RECEIVED
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
+    # Web channel extras (migration 0003). All optional so the webhook
+    # channel, which has none of them, keeps working unchanged.
+    client_message_id: str | None = Field(
+        default=None, description="Browser-generated id; makes a POST idempotent."
+    )
+    turn_id: UUID | None = Field(
+        default=None, description="Groups a user message with the reply it produced."
+    )
+    job_cards: list[dict[str, Any]] = Field(default_factory=list)
+    tailoring_id: UUID | None = None
+
+
+class Conversation(BaseModel):
+    id: UUID = Field(default_factory=uuid4)
+    user_id: UUID
+    title: str = "New conversation"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+# ---------------------------------------------------------------------------
+# Web accounts
+# ---------------------------------------------------------------------------
+
+
+class UserAccount(BaseModel):
+    """A signed-in website user (a `users` row with an email)."""
+
+    id: UUID = Field(default_factory=uuid4)
+    email: str
+    full_name: str | None = None
+    seniority_band: SeniorityBand | None = None
+    preferred_location_tiers: list[LocationTier] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class AuthCode(BaseModel):
+    """A one-time sign-in code. Only a keyed hash of the code is stored."""
+
+    id: UUID = Field(default_factory=uuid4)
+    email: str
+    code_hash: str
+    expires_at: datetime
+    attempts: int = 0
+    consumed_at: datetime | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
 
 class TurnLease(BaseModel):
     """A claim-and-lease record preventing double-processing of a turn."""
