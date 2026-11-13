@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
@@ -10,6 +11,7 @@ import { useConversation } from "@/hooks/useConversation";
 import { useConversationList } from "@/hooks/useConversationList";
 import { clearPending, peekPending, setPending } from "@/lib/chat/pending";
 import { uuid } from "@/lib/id";
+import { buttonClasses } from "@/components/ui/Button";
 import { ErrorNotice } from "@/components/ui/ErrorNotice";
 import { Skeleton } from "@/components/ui/Spinner";
 import { Composer } from "./Composer";
@@ -24,15 +26,16 @@ import { SuggestedPrompts } from "./SuggestedPrompts";
 export function ChatView({ conversationId }: { conversationId: string | null }) {
   const router = useRouter();
   const { upsert, refresh } = useConversationList();
-  const pending = conversationId ? peekPending(conversationId) : undefined;
-  const { messages, loading, error, append, reload } = useConversation(conversationId, Boolean(pending));
+  // Captured once per mount. State (unlike a ref or a bare peek) survives Strict Mode's simulated
+  // remount, while a real revisit of the page starts with nothing pending and loads history.
+  const [pending] = useState(() => (conversationId ? peekPending(conversationId) : undefined));
+  const { messages, loading, error, notFound, append, reload } = useConversation(conversationId, Boolean(pending));
   const [startError, setStartError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
 
   const stream = useChatStream({
     onComplete: (message: ChatMessage) => {
       append(message);
-      if (conversationId) clearPending(conversationId);
       void refresh(); // title / preview / ordering changed on the server
     },
   });
@@ -46,8 +49,10 @@ export function ChatView({ conversationId }: { conversationId: string | null }) 
   // First message of a new chat was handed off by the /app/chat page: send it now.
   // No "already started" guard on purpose: in dev, Strict Mode runs this effect twice and the
   // first run is aborted, so the second must resend. client_message_id makes that harmless.
+  // The hand-off is cleared right away; `pending` (state) still holds it for the second run.
   useEffect(() => {
     if (!conversationId || !pending) return;
+    clearPending(conversationId);
     sendInThread(conversationId, pending.body, pending.clientMessageId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
@@ -68,7 +73,7 @@ export function ChatView({ conversationId }: { conversationId: string | null }) 
     }
   }
 
-  const empty = !loading && !error && !pending && messages.length === 0 && stream.state.status === "idle";
+  const empty = !loading && !error && !notFound && !pending && messages.length === 0 && stream.state.status === "idle";
   const busy = stream.busy || starting;
 
   return (
@@ -76,6 +81,12 @@ export function ChatView({ conversationId }: { conversationId: string | null }) 
       {loading ? (
         <div className="mx-auto w-full max-w-3xl space-y-4 px-4 py-6">
           <Skeleton className="ml-auto h-10 w-2/3" /><Skeleton className="h-24 w-full" />
+        </div>
+      ) : notFound ? (
+        <div className="mx-auto w-full max-w-3xl p-6 text-center">
+          <h1 className="font-display text-2xl">Conversation not found</h1>
+          <p className="mt-2 text-muted">It may have been deleted, or the link is wrong.</p>
+          <Link href="/app/chat" className={buttonClasses("primary", "md", "mt-4")}>Start a new chat</Link>
         </div>
       ) : error ? (
         <div className="mx-auto w-full max-w-3xl p-6"><ErrorNotice message={error} onRetry={reload} /></div>

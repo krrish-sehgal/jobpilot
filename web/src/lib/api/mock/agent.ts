@@ -2,6 +2,7 @@ import type { ChatMessage, JobCard, StreamEvent } from "../types";
 import { db, primaryResume, type MockTurn } from "./db";
 import { isSearchIntent, parseQuery, rankJobs } from "./match";
 import { startTailoring } from "./tailoring";
+import { uuid } from "@/lib/id";
 import { newId, nowIso, sleep } from "./util";
 
 /*
@@ -38,8 +39,9 @@ export async function* runTurn(turn: MockTurn, signal: AbortSignal): AsyncGenera
   await sleep(550, signal);
 
   // Demo hook: "/fail" errors the first stream so the retry UI can be seen.
-  if (/\/fail\b/i.test(text) && !turn.failedOnce) {
-    turn.failedOnce = true;
+  const failKey = `${turn.conversationId}:${text}`;
+  if (/\/fail\b/i.test(text) && !db.failedDemo.has(failKey)) {
+    db.failedDemo.add(failKey);
     yield { event: "error", data: { code: "internal", message: "The agent timed out while searching. Nothing was lost.", retryable: true } };
     return;
   }
@@ -49,33 +51,37 @@ export async function* runTurn(turn: MockTurn, signal: AbortSignal): AsyncGenera
   let tailoringId: string | null = null;
   let tailoringJobId = "";
 
-  if (/\btailor|rewrite my resume|improve my resume\b/i.test(text)) {
+  if (/\b(tailor|rewrite my resume|improve my resume)\b/i.test(text)) {
     const target = pickTarget(text, lastCards(turn.conversationId));
     const resume = primaryResume();
     if (!target || !resume) {
       reply = !resume ? "I need a parsed resume first. Upload one on the **Resume** page and ask again." : "Ask me for some roles first, then tell me which one to tailor your resume for.";
     } else {
+      const readId = uuid();
+      const tailorId = uuid();
       yield { event: "status", data: { phase: "calling_tool" } };
-      yield { event: "tool_call", data: { call_id: "c1", name: "fetch_resume", label: "Reading your resume" } };
+      yield { event: "tool_call", data: { call_id: readId, name: "fetch_resume", label: "Reading your resume" } };
       await sleep(600, signal);
-      yield { event: "tool_result", data: { call_id: "c1", name: "fetch_resume", ok: true, summary: `Loaded ${resume.summary.file_name}` } };
-      yield { event: "tool_call", data: { call_id: "c2", name: "tailor_resume", label: `Tailoring for ${target.title} at ${target.company}` } };
+      yield { event: "tool_result", data: { call_id: readId, name: "fetch_resume", ok: true, summary: `Loaded ${resume.summary.file_name}` } };
+      yield { event: "tool_call", data: { call_id: tailorId, name: "tailor_resume", label: `Tailoring for ${target.title} at ${target.company}` } };
       await sleep(900, signal);
       tailoringId = startTailoring(resume, { jobId: target.job_id });
       tailoringJobId = target.job_id;
-      yield { event: "tool_result", data: { call_id: "c2", name: "tailor_resume", ok: true, summary: "Started a tailoring" } };
+      yield { event: "tool_result", data: { call_id: tailorId, name: "tailor_resume", ok: true, summary: "Started a tailoring" } };
       reply = `I've started tailoring your resume for **${target.title}** at **${target.company}**. I'll compare it to the posting, then suggest edits you can accept or reject one by one.`;
     }
   } else if (isSearchIntent(parseQuery(text))) {
     const q = parseQuery(text);
+    const recallId = uuid();
+    const searchId = uuid();
     yield { event: "status", data: { phase: "calling_tool" } };
-    yield { event: "tool_call", data: { call_id: "c1", name: "recall_memory", label: "Checking what I know about your preferences" } };
+    yield { event: "tool_call", data: { call_id: recallId, name: "recall_memory", label: "Checking what I know about your preferences" } };
     await sleep(500, signal);
-    yield { event: "tool_result", data: { call_id: "c1", name: "recall_memory", ok: true, summary: "Recalled 2 preferences" } };
-    yield { event: "tool_call", data: { call_id: "c2", name: "search_jobs", label: `Searching ${q.description}` } };
+    yield { event: "tool_result", data: { call_id: recallId, name: "recall_memory", ok: true, summary: "Recalled 2 preferences" } };
+    yield { event: "tool_call", data: { call_id: searchId, name: "search_jobs", label: `Searching ${q.description}` } };
     await sleep(900, signal);
     cards = rankJobs(q);
-    yield { event: "tool_result", data: { call_id: "c2", name: "search_jobs", ok: true, summary: `Found ${cards.length} matching roles` } };
+    yield { event: "tool_result", data: { call_id: searchId, name: "search_jobs", ok: true, summary: `Found ${cards.length} matching roles` } };
     const top = cards[0]!;
     reply = [
       `I found **${cards.length} roles** that fit. The strongest is **${top.title}** at **${top.company}** (${top.match_score}% match).`,
@@ -95,6 +101,16 @@ export async function* runTurn(turn: MockTurn, signal: AbortSignal): AsyncGenera
     ].join("\n");
   }
 
+  // Persist the reply before streaming it, so it is stored even if the client aborts mid-stream
+  // (the real backend keeps generating after a disconnect; see useChatStream).
+  const message: ChatMessage = { id: newId(), role: "assistant", body: reply, job_cards: cards, tailoring_id: tailoringId, created_at: nowIso() };
+  const conv = db.conversations.get(turn.conversationId);
+  if (conv) {
+    conv.messages.push(message);
+    conv.summary.last_message_preview = reply.replace(/[*\n-]+/g, " ").trim().slice(0, 90);
+    conv.summary.updated_at = message.created_at;
+  }
+
   yield { event: "status", data: { phase: "writing" } };
   for (const piece of chunk(reply)) {
     yield { event: "token", data: { text: piece } };
@@ -102,13 +118,5 @@ export async function* runTurn(turn: MockTurn, signal: AbortSignal): AsyncGenera
   }
   if (cards.length) yield { event: "job_cards", data: { cards } };
   if (tailoringId) yield { event: "tailoring_started", data: { tailoring_id: tailoringId, job_id: tailoringJobId } };
-
-  const message: ChatMessage = { id: newId("msg"), role: "assistant", body: reply, job_cards: cards, tailoring_id: tailoringId, created_at: nowIso() };
-  const conv = db.conversations.get(turn.conversationId);
-  if (conv) {
-    conv.messages.push(message);
-    conv.summary.last_message_preview = reply.replace(/[*\n-]+/g, " ").trim().slice(0, 90);
-    conv.summary.updated_at = message.created_at;
-  }
   yield { event: "done", data: { message_id: message.id } };
 }

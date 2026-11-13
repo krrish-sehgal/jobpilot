@@ -39,7 +39,7 @@ function extractTerms(jd: string): string[] {
 
 function buildSuggestions(sections: ResumeSections, missing: string[], jobTitle: string): Suggestion[] {
   const kw = (i: number) => missing[i] ?? missing[0] ?? "automated testing";
-  const mk = (s: Omit<Suggestion, "id" | "decision">): Suggestion => ({ ...s, id: newId("sug"), decision: "pending" });
+  const mk = (s: Omit<Suggestion, "id" | "decision">): Suggestion => ({ ...s, id: newId(), decision: "pending" });
   const bullet = (id: string) => sections.experience.flatMap((e) => e.bullets).find((b) => b.id === id)?.text ?? null;
 
   const out: Suggestion[] = [
@@ -94,7 +94,7 @@ export function startTailoring(resume: MockResume, input: { jobId?: string; jobD
   const total = keywordSeeds.reduce((n, k) => n + weight(k), 0) || 1;
   const found = keywordSeeds.filter((k) => k.found_in_resume).reduce((n, k) => n + weight(k), 0);
 
-  const id = newId("tailor");
+  const id = newId();
   db.tailorings.set(id, {
     id, resumeId: resume.summary.id, jobId: job?.job_id ?? null, jobTitle, company: job?.company ?? null,
     createdAt: nowIso(), readyAt: Date.now() + RUN_MS, keywordSeeds,

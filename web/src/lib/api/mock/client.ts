@@ -28,7 +28,7 @@ export class MockApiClient implements ApiClient {
     // Any 6-digit code works except 000000, so the error state can be demoed.
     if (!/^\d{6}$/.test(code) || code === "000000") throw new ApiError("validation_failed", "That code is incorrect or expired.", 422);
     db.user.email = email;
-    return { access_token: `mock-${newId("tok")}`, expires_at: new Date(Date.now() + 8 * 3600_000).toISOString(), user: { ...db.user } };
+    return { access_token: `mock-${newId()}`, expires_at: new Date(Date.now() + 8 * 3600_000).toISOString(), user: { ...db.user } };
   }
   async me(): Promise<User> {
     await sleep(80);
@@ -42,7 +42,7 @@ export class MockApiClient implements ApiClient {
   }
   async createConversation(): Promise<ConversationSummary> {
     await sleep(80);
-    const summary: ConversationSummary = { id: newId("conv"), title: "New conversation", last_message_preview: null, updated_at: nowIso() };
+    const summary: ConversationSummary = { id: newId(), title: "New conversation", last_message_preview: null, updated_at: nowIso() };
     db.conversations.set(summary.id, { summary, messages: [] });
     return summary;
   }
@@ -58,12 +58,12 @@ export class MockApiClient implements ApiClient {
     if (existing) return existing; // idempotent retry: same turn, no duplicate message
     const conv = db.conversations.get(id);
     if (!conv) throw notFound("Conversation");
-    const message: ChatMessage = { id: newId("msg"), role: "user", body, job_cards: [], tailoring_id: null, created_at: nowIso() };
+    const message: ChatMessage = { id: newId(), role: "user", body, job_cards: [], tailoring_id: null, created_at: nowIso() };
     conv.messages.push(message);
     if (conv.summary.title === "New conversation") conv.summary.title = body.slice(0, 40);
     conv.summary.updated_at = message.created_at;
-    const turnId = newId("turn");
-    db.turns.set(turnId, { id: turnId, conversationId: id, userBody: body, failedOnce: false });
+    const turnId = newId();
+    db.turns.set(turnId, { id: turnId, conversationId: id, userBody: body });
     const ack = { message_id: message.id, turn_id: turnId };
     db.sent.set(clientMessageId, ack);
     return ack;
@@ -94,7 +94,7 @@ export class MockApiClient implements ApiClient {
       await sleep(110, signal);
       onProgress(i / 5);
     }
-    const id = newId("resume");
+    const id = newId();
     const failing = /fail/i.test(file.name); // demo hook: name a file "fail.pdf" to see the failed state
     const hadPrimary = [...db.resumes.values()].some((r) => r.summary.is_primary);
     db.resumes.set(id, {

@@ -31,7 +31,7 @@ Mock mode (`src/lib/api/mock/`) is realistic enough to demo every state:
 - Ask "tailor my resume for the first one" and the agent emits `tailoring_started`.
 - Tailoring (`tailoring.ts`) is `running` for ~2.8 s, then `ready` with ~6 suggestions.
 - Demo hooks: sign in with any email and any 6-digit code except `000000`; type `/fail` in a chat message to see the
-  retryable error state (the retry succeeds); upload a file whose name contains `fail` to see a failed parse.
+  retryable error state (the retry, sent with a fresh `client_message_id`, succeeds); upload a file whose name contains `fail` to see a failed parse.
 - State is a module singleton (`db.ts`): it survives navigation and resets on reload.
 - Mock "Export DOCX" produces RTF (a real .docx needs zipping); PDF export is a small hand-built valid PDF.
 
@@ -88,8 +88,9 @@ which flips auth to anonymous, and `RequireAuth` (used by `app/app/layout.tsx`) 
    `tailoring_started` add cards. `StreamingBubble` renders that state inside an `aria-live` region; `MessageList`
    auto-scrolls only while you are near the bottom.
 5. **Finish.** On `done` the accumulated reply becomes a normal `ChatMessage`, is appended to the thread, and the
-   sidebar list refreshes. On `error` (or a dropped stream) the bubble shows a message with **Retry**, which re-sends
-   with the *same* `client_message_id`.
+   sidebar list refreshes. On `error` (or a dropped stream) the bubble shows a message with **Retry**. After a terminal
+   `error` event, Retry sends a *fresh* `client_message_id` (the backend returns the original failed turn for a reused
+   id). If the connection dropped without any terminal event, it reuses the *same* id so the server dedupes.
 
 ## Data flow of one tailoring
 
@@ -110,9 +111,8 @@ which flips auth to anonymous, and `RequireAuth` (used by `app/app/layout.tsx`) 
   suggestions applied, and always takes it from the latest server response. The mock computes it that way.
 - **`reorder_section`**: the contract doesn't say what `proposed` holds. The UI assumes a comma-separated section
   order (`"summary, skills, experience, projects, education"`); unknown names are ignored.
-- **Retrying a failed turn**: the contract says reposting a `client_message_id` returns the original ids, but not
-  whether that turn's stream can be reopened after an `error`. The client assumes it can (or that the server starts a
-  fresh attempt for the same turn).
+- **Retrying a failed turn**: reposting a `client_message_id` returns the original (failed) turn, so after a terminal
+  `error` event the client retries with a fresh id; after a dropped connection with no terminal event it reuses the id.
 - **`rewrite_bullet.target_id`** is matched against bullet ids in both experience and projects.
 - **Unknown stream events** are ignored rather than treated as errors, so the server can add events safely.
 - **Auth `expires_at`** is honored client-side: an expired stored token is dropped before any request.

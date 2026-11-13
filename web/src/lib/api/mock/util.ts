@@ -1,3 +1,5 @@
+import { uuid } from "@/lib/id";
+
 /** Abortable sleep: mock streams must stop promptly when the user navigates away. */
 export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -15,4 +17,5 @@ export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
 }
 
 export const nowIso = () => new Date().toISOString();
-export const newId = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
+/** The real backend uses UUIDs for every id, so the mock does too. */
+export const newId = (): string => uuid();

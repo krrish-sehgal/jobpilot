@@ -6,9 +6,11 @@
  * picks it up and streams the reply. A module variable (not storage) is enough
  * because it only needs to survive one client-side navigation.
  *
- * We `peek` rather than `take`, and clear after the turn finishes: React Strict
- * Mode runs effects twice in development, and the second run must still find
- * the message. Resending is safe because `clientMessageId` makes it idempotent.
+ * ChatView `peek`s it once into component state on mount, then clears it as
+ * soon as it starts sending. State survives Strict Mode's simulated remount, so
+ * the second effect run still has the message, while a later visit to the same
+ * URL finds nothing pending and loads history instead of re-sending. Resending
+ * within one mount is safe because `clientMessageId` makes it idempotent.
  */
 export interface PendingMessage {
   body: string;

@@ -18,9 +18,10 @@ export function MessageList({ messages, followKey, children }: { messages: ChatM
   const pinned = useRef(true);
   const [showJump, setShowJump] = useState(false);
 
-  const toBottom = useCallback((smooth = false) => {
+  // Instant on purpose: a smooth scroll fires onScroll mid-way, which would un-pin us before we arrive.
+  const toBottom = useCallback(() => {
     const el = scroller.current;
-    if (el) el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "auto" });
   }, []);
 
   const onScroll = () => {
@@ -51,7 +52,7 @@ export function MessageList({ messages, followKey, children }: { messages: ChatM
       {showJump ? (
         <button
           type="button"
-          onClick={() => { pinned.current = true; setShowJump(false); toBottom(true); }}
+          onClick={() => { pinned.current = true; setShowJump(false); toBottom(); }}
           className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1.5 text-sm shadow-card"
         >
           <ArrowDown className="h-3.5 w-3.5" aria-hidden /> Jump to latest

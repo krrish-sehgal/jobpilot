@@ -9,8 +9,6 @@ export interface MockTurn {
   id: string;
   conversationId: string;
   userBody: string;
-  /** Used by the "/fail" demo: the first stream errors, the retry succeeds. */
-  failedOnce: boolean;
 }
 
 export interface MockResume {
@@ -37,6 +35,8 @@ export const db = {
   resumes: new Map<string, MockResume>(),
   tailorings: new Map<string, TailoringRecord>(),
   turns: new Map<string, MockTurn>(),
+  /** "/fail" demo: conversation+message pairs whose first attempt already errored, so the retry (a fresh client_message_id) succeeds. */
+  failedDemo: new Set<string>(),
   /** client_message_id -> original ids, which is what makes sendMessage idempotent. */
   sent: new Map<string, SentMessage>(),
 };

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { describeError } from "@/lib/api/errors";
+import { describeError, isApiError } from "@/lib/api/errors";
 import type { ChatMessage } from "@/lib/api/types";
 
 /**
@@ -15,6 +15,8 @@ export function useConversation(conversationId: string | null, skipLoad = false)
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(Boolean(conversationId) && !skipLoad);
   const [error, setError] = useState<string | null>(null);
+  /** A 404 is permanent, so it is reported apart from `error` (which offers a retry). */
+  const [notFound, setNotFound] = useState(false);
   const [nonce, setNonce] = useState(0);
 
   useEffect(() => {
@@ -22,10 +24,15 @@ export function useConversation(conversationId: string | null, skipLoad = false)
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setNotFound(false);
     api
       .listMessages(conversationId)
       .then((m) => !cancelled && setMessages(m))
-      .catch((e) => !cancelled && setError(describeError(e)))
+      .catch((e) => {
+        if (cancelled) return;
+        if (isApiError(e) && e.code === "not_found") setNotFound(true);
+        else setError(describeError(e));
+      })
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
@@ -41,5 +48,5 @@ export function useConversation(conversationId: string | null, skipLoad = false)
 
   const reload = useCallback(() => setNonce((n) => n + 1), []);
 
-  return { messages, loading, error, append, reload };
+  return { messages, loading, error, notFound, append, reload };
 }
