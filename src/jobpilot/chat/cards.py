@@ -107,7 +107,8 @@ def render_job_card(
         description_preview=description_preview,
         compensation_text=compensation_text,
         apply_url=job.apply_url,
-        match_score=round(scored.combined_score, 2),
+        # 0-100 integer so the website shows it as a percentage directly.
+        match_score=round(scored.combined_score * 100),
         location_tier=job.location_tier.value,
         match_reasons=match_reasons(
             scored,

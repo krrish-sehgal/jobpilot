@@ -64,7 +64,7 @@ class JobCardOut(BaseModel):
     description_preview: str
     compensation_text: str | None
     apply_url: str
-    match_score: float
+    match_score: int  # 0-100
     match_reasons: list[str]
     posted_at: str | None
     is_saved: bool

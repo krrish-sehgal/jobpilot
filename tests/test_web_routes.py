@@ -98,7 +98,7 @@ def test_job_detail_has_card_and_detail_fields(web, auth):
         "employment_type", "min_years_experience",
     } == set(body)  # fmt: skip
     assert body["job_id"] == str(job.id) and body["employment_type"] == "full_time"
-    assert 0 <= body["match_score"] <= 1 and body["posted_at"].endswith("Z")
+    assert 0 <= body["match_score"] <= 100 and body["posted_at"].endswith("Z")
 
 
 def test_save_and_unsave_are_idempotent_and_listed(web, auth):

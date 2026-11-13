@@ -74,7 +74,7 @@ Each event has an `event:` name and a JSON `data:` line.
 type JobCard = { job_id: string; title: string; company: string; location_text: string | null;
   location_tier: LocationTier; seniority_band: SeniorityBand; role_category: RoleCategory;
   skills: string[]; description_preview: string; compensation_text: string | null;
-  apply_url: string; match_score: number; match_reasons: string[]; posted_at: string | null;
+  apply_url: string; match_score: number /* integer 0-100 */; match_reasons: string[]; posted_at: string | null;
   is_saved: boolean }
 type JobDetail = JobCard & { description: string; employment_type: EmploymentType;
   min_years_experience: number }
