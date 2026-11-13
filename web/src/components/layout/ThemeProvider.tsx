@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 type Theme = "light" | "dark" | "system";
+/** Keep in sync with THEME_INIT_SCRIPT in app/layout.tsx, which reads it before React hydrates. */
 const KEY = "jobpilot.theme";
 
 const ThemeContext = createContext<{ theme: Theme; setTheme: (t: Theme) => void } | null>(null);

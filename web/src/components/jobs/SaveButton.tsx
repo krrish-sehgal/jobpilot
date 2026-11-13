@@ -13,12 +13,10 @@ export function SaveButton({
   jobId,
   initialSaved,
   onChange,
-  compact = false,
 }: {
   jobId: string;
   initialSaved: boolean;
   onChange?: (saved: boolean) => void;
-  compact?: boolean;
 }) {
   const [saved, setSaved] = useState(initialSaved);
   const [pending, setPending] = useState(false);
@@ -54,7 +52,7 @@ export function SaveButton({
       )}
     >
       <Icon className="h-4 w-4" aria-hidden />
-      <span className={compact ? "sr-only" : undefined}>{failed ? "Retry" : saved ? "Saved" : "Save"}</span>
+      <span>{failed ? "Retry" : saved ? "Saved" : "Save"}</span>
     </button>
   );
 }

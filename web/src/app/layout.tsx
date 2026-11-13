@@ -12,9 +12,15 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = { themeColor: "#0e5a4b" };
 
+const THEME_INIT_SCRIPT = `try{var t=localStorage.getItem("jobpilot.theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}`;
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Applies a saved light/dark choice before first paint, so there is no flash of the wrong theme. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body>
         <ThemeProvider>
           <AuthProvider>{children}</AuthProvider>

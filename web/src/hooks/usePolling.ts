@@ -32,6 +32,9 @@ export function usePolling<T>(fetcher: () => Promise<T>, { intervalMs, isDone, e
 
   useEffect(() => {
     if (!enabled) return;
+    // A fresh run must not show the previous run's result or error (e.g. a stale failure from the last upload).
+    setData(null);
+    setError(null);
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
     let failures = 0;
@@ -64,5 +67,5 @@ export function usePolling<T>(fetcher: () => Promise<T>, { intervalMs, isDone, e
     setNonce((n) => n + 1);
   }, []);
 
-  return { data, setData, error, retry };
+  return { data, error, retry };
 }

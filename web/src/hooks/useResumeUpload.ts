@@ -33,7 +33,10 @@ export function useResumeUpload(onFinished: (resumeId: string) => void) {
   useEffect(() => {
     if (state.phase !== "parsing") return;
     const r = poll.data;
-    if (poll.error) return setState({ phase: "failed", fileName: state.fileName, message: poll.error });
+    if (poll.error) {
+      setState({ phase: "failed", fileName: state.fileName, message: poll.error });
+      return;
+    }
     if (!r || r.id !== state.resumeId) return; // stale result from a previous upload
     if (r.status === "ready") {
       setState({ phase: "ready", fileName: state.fileName, resumeId: r.id });
@@ -48,7 +51,10 @@ export function useResumeUpload(onFinished: (resumeId: string) => void) {
 
   const upload = useCallback(async (file: File) => {
     const invalid = validateResumeFile(file);
-    if (invalid) return setState({ phase: "failed", fileName: file.name, message: describeError(invalid) });
+    if (invalid) {
+      setState({ phase: "failed", fileName: file.name, message: describeError(invalid) });
+      return;
+    }
 
     abort.current?.abort();
     const controller = new AbortController();

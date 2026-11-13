@@ -4,5 +4,6 @@ import { TailoringView } from "@/components/tailor/TailoringView";
 export const metadata: Metadata = { title: "Tailored resume" };
 
 export default function TailoringPage({ params }: { params: { tailoringId: string } }) {
-  return <TailoringView tailoringId={params.tailoringId} />;
+  // key: a different tailoring must start with fresh state, not the previous one's.
+  return <TailoringView key={params.tailoringId} tailoringId={params.tailoringId} />;
 }
