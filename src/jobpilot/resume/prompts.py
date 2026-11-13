@@ -1,7 +1,7 @@
 """Prompts for resume parsing, job keyword extraction, and tailoring.
 
 Each prompt is a module constant so tests can recognise which call a
-scripted fake LLM is answering (by identity), and so prompt changes show
+scripted test LLM is answering (by identity), and so prompt changes show
 up as one reviewable diff. The comments above each constant explain the
 rules that matter, since a prompt is code whose behaviour is hard to
 infer from reading it.

@@ -31,7 +31,7 @@ def _check_secrets(settings: Settings) -> None:
         logger.warning("auth_token_secret_is_placeholder", environment=settings.environment)
         return
     raise ConfigurationError(
-        "JOBPILOT_AUTH_TOKEN_SECRET must be set to a real secret outside development"
+        "JOBPILOT_AUTH_TOKEN_SECRET must be set to a secret value outside development"
     )
 
 
@@ -41,7 +41,7 @@ def create_web_app(
     """Build the FastAPI app.
 
     Pass `container` to supply pre-built dependencies (tests do, with the
-    in-memory fakes); otherwise one is built from `settings`.
+    in-memory test doubles); otherwise one is built from `settings`.
     """
 
     settings = settings or (container.settings if container else get_settings())

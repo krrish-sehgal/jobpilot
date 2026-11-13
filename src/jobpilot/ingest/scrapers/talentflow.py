@@ -1,4 +1,4 @@
-"""Scraper for Talentflow, an invented applicant tracking system.
+"""Scraper for Talentflow, an applicant tracking system.
 
 Talentflow exposes a public JSON listings endpoint per employer
 career site, paginated with an opaque `next` cursor token. This

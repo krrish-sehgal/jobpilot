@@ -20,14 +20,14 @@ jobpilot/
     ingest/          scrapers, dedup, checkpointing, queue consumer, LLM enrichment
     search/          embeddings, hybrid retrieval, the ranking engine
     db/              repository layer + SQL migrations
-    integrations/    LLM / object storage / queue / Supabase boundaries (+ fakes)
+    integrations/    LLM / object storage / queue / Supabase boundaries (+ in-memory test doubles)
     utils/           retry/backoff, rate limiting, hashing, text chunking
   db/migrations/      (see src/jobpilot/db/migrations)
   docs/               architecture, data model, operations
-  tests/              unit tests against the pure logic and the fakes
+  tests/              unit tests against the pure logic and in-memory test doubles
 ```
 
-The website (chat + resume tailoring, with a no-backend mock mode) lives in [`web/`](web/README.md); its API contract is [`docs/web-api.md`](docs/web-api.md).
+The website (chat + resume tailoring, with an offline mode for local frontend development) lives in [`web/`](web/README.md); its API contract is [`docs/web-api.md`](docs/web-api.md).
 
 ## Where to look
 
@@ -53,7 +53,7 @@ Two features, each traced from the screen to the backend:
 | Suggestions + no-fabrication check | `components/tailor/SuggestionCard.tsx`, `DiffText.tsx`, `lib/diff.ts` | `resume/tailor.py`, `resume/guard.py` |
 | Accept / reject, preview, export | `hooks/useTailoring.ts`, `ExportButtons.tsx`, `lib/resumeApply.ts` | `resume/apply.py`, `resume/render.py` |
 
-Try it with no backend: `cd web && npm install && npm run dev` (mock mode is the default; any email and any 6-digit code except `000000` signs you in).
+Run the frontend without a backend: `cd web && npm install && npm run dev` (offline mode is the default for local development; any email and any 6-digit code except `000000` signs you in).
 
 ## The core ideas
 
@@ -72,7 +72,7 @@ Try it with no backend: `cd web && npm install && npm run dev` (mock mode is the
    about a user from conversation history (`memory/extraction.py`)
    and stores them for later semantic recall (`memory/store.py`),
    so the agent doesn't ask a returning user to repeat themselves.
-4. **Ingestion by platform.** Four scrapers, one per invented
+4. **Ingestion by platform.** Four scrapers, one per
    applicant tracking system (Talentflow, Hirebridge, Recruitly,
    Stackroll), share a `BaseScraper` contract. A scraper reaches
    every employer on that platform in one crawl. Raw postings flow
@@ -118,17 +118,21 @@ cp .env.example .env
 make test
 ```
 
-The test suite runs entirely against in-memory fakes
+PDF export uses WeasyPrint, which needs the Pango system libraries
+(`brew install pango` / `apt install libpango-1.0-0 libpangoft2-1.0-0`).
+They are only loaded when a PDF is actually rendered.
+
+The test suite runs against in-memory test doubles
 (`FakeLLMClient`, `InMemoryDatabase`, `InMemoryQueueBackend`,
-`InMemoryObjectStorage`) and requires no external credentials. Filling
-in `.env` with real Supabase, LLM, storage, and queue credentials is
-only needed to run the webhook service or the ingestion workers
-against live infrastructure.
+`InMemoryObjectStorage`) and requires no external credentials or
+network access. Filling in `.env` with Supabase, LLM, S3-compatible
+storage, and SQS credentials is needed to run the webhook service or the
+ingestion workers.
 
 ```bash
 make lint      # ruff
 make test      # pytest
-make run       # start the webhook service (needs a real database configured)
+make run       # start the webhook service (needs Supabase configured)
 make run-web   # start the web API for the website on :8001
 ```
 
@@ -156,10 +160,10 @@ Web settings: `JOBPILOT_WEB_ALLOWED_ORIGINS` (comma-separated CORS
 origins), `JOBPILOT_AUTH_TOKEN_SECRET` (must be set outside
 development; the app refuses to start with the placeholder),
 `JOBPILOT_AUTH_TOKEN_TTL_HOURS`, `JOBPILOT_RESUME_MAX_BYTES`. With
-placeholder credentials in a development environment, `make run-web`
-falls back to the in-memory database and storage and the fake LLM, so it
-starts without infrastructure (resume parsing and chat replies need a
-real model, since the fake returns canned text). Sign-in codes are
+credentials not configured in a development environment, `make run-web`
+uses in-memory backends and a canned-reply LLM, so it starts without
+infrastructure (resume parsing and chat replies need a configured model
+endpoint). Sign-in codes are
 written to the log instead of emailed outside production.
 
 ## Resume tailoring
@@ -169,8 +173,8 @@ screen and the agent's `tailor_resume` tool.
 
 1. **Upload.** PDF or DOCX is validated by content (magic bytes), not
    file name, and capped at 5 MB. Text extraction is behind a
-   `TextExtractor` protocol; a deployment plugs in pdfminer and
-   python-docx, and a dependency-free stub is used in tests.
+   `TextExtractor` protocol; `DocumentTextExtractor` uses pypdf and
+   python-docx, and tests use a plain-text double.
 2. **Parse.** One LLM call with a strict JSON prompt, validated by
    pydantic, with stable ids on every bullet.
 3. **Score.** A deterministic 0-100 match against the job: required
@@ -182,8 +186,8 @@ screen and the agent's `tailor_resume` tool.
    the user sees it; `add_skill` is allowed only for skills the resume
    demonstrates elsewhere.
 5. **Decide and export.** Accepted suggestions are applied to a copy of
-   the resume and rendered as ATS-friendly single-column HTML, PDF or
-   DOCX behind a `DocumentRenderer` protocol.
+   the resume and rendered as ATS-friendly single-column HTML, PDF (WeasyPrint) or
+   DOCX (python-docx) behind a `DocumentRenderer` protocol.
 
 Design notes, including what the guard does and does not catch, are in
 [`docs/architecture.md`](docs/architecture.md).
@@ -224,12 +228,12 @@ keyword normalisation and coverage, match scoring, the fabrication guard
 (accept and reject cases), applying decisions, sign-in code expiry and
 attempt limits, tampered-token rejection, SSE formatting, idempotent
 `client_message_id`, and every route through a `TestClient` over the
-in-memory fakes.
+in-memory test doubles.
 
 ## Deployment notes
 
 See [`docs/operations.md`](docs/operations.md) for how the pieces are
-meant to run in production: the webhook service as a small stateless
+run in production: the webhook service as a small stateless
 API, the enrichment worker and scraper runners as separate long-lived
 processes (so a slow LLM provider never blocks scraping), and the
 migration order in `db/migrations/`.

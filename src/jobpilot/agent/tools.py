@@ -30,7 +30,7 @@ class ResumeFetcher(ABC):
 
     A real deployment backs this with object storage or a resume
     parsing service; `StaticResumeFetcher` below is a simple
-    dict-backed stand-in used in tests and local development.
+    dict-backed implementation used in tests.
     """
 
     @abstractmethod

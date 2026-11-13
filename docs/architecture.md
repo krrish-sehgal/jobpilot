@@ -193,9 +193,9 @@ language model is the part least trusted:
    ids (a UUIDv5 of position and text) so re-parsing the same text gives
    the same ids. Upload validation (`extract.py`) trusts file content,
    not names: `%PDF-` magic bytes, or a zip that really contains
-   `word/document.xml`, under a 5 MB limit. Real text extraction sits
-   behind a `TextExtractor` protocol (pdfminer / python-docx in a real
-   deployment).
+   `word/document.xml`, under a 5 MB limit. Text extraction sits
+   behind a `TextExtractor` protocol (`DocumentTextExtractor`: pypdf for
+   PDF, python-docx for DOCX).
 2. **Keywords** (`keywords.py`). Required and preferred terms come from
    the job's structured `skills` plus an LLM read of the description,
    normalised to one canonical form (`js` is `javascript`, `k8s` is

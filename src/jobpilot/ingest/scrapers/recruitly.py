@@ -1,4 +1,4 @@
-"""Scraper for Recruitly, an invented applicant tracking system.
+"""Scraper for Recruitly, an applicant tracking system.
 
 Recruitly's public feed is a GraphQL endpoint returning a Relay-style
 connection (`edges` / `pageInfo.endCursor` / `pageInfo.hasNextPage`),

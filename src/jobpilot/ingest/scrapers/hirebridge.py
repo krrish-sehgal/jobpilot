@@ -1,4 +1,4 @@
-"""Scraper for Hirebridge, an invented applicant tracking system.
+"""Scraper for Hirebridge, an applicant tracking system.
 
 Unlike Talentflow's cursor pagination, Hirebridge paginates with a
 1-indexed `page` number and reports `total_pages` up front, so

@@ -42,7 +42,7 @@ class BaseScraper(ABC):
     @property
     @abstractmethod
     def platform_name(self) -> str:
-        """The invented ATS platform name this scraper targets."""
+        """The ATS platform name this scraper targets."""
 
     @abstractmethod
     def fetch_page(self, cursor: str | None) -> ScraperPage:

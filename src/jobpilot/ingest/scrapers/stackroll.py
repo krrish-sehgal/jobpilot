@@ -1,4 +1,4 @@
-"""Scraper for Stackroll, an invented applicant tracking system.
+"""Scraper for Stackroll, an applicant tracking system.
 
 Stackroll's search endpoint uses offset-based pagination (`offset` /
 `limit` / `total_count`) rather than a cursor token, which is the
