@@ -68,6 +68,18 @@ class Settings(BaseSettings):
     agent_max_turns: int = Field(default=6, ge=1, le=20)
     agent_max_tool_calls_per_turn: int = Field(default=4, ge=1, le=20)
 
+    # Web service (the HTTP API the website talks to; see docs/web-api.md)
+    web_allowed_origins: str = Field(
+        default="http://localhost:3000",
+        description="Comma-separated browser origins allowed by CORS.",
+    )
+    auth_token_secret: str = Field(
+        default="replace-with-token-secret",
+        description="HMAC key for access tokens and one-time-code hashing.",
+    )
+    auth_token_ttl_hours: int = Field(default=72, ge=1, le=24 * 30)
+    resume_max_bytes: int = Field(default=5 * 1024 * 1024, ge=1024)
+
     # Ranking weights (must sum to 1.0; validated in search.ranking)
     ranking_weight_semantic: float = Field(default=0.45, ge=0, le=1)
     ranking_weight_recency: float = Field(default=0.15, ge=0, le=1)
@@ -83,6 +95,21 @@ class Settings(BaseSettings):
     retry_max_attempts: int = Field(default=5, ge=1)
     retry_base_delay_seconds: float = Field(default=0.5, gt=0)
     retry_max_delay_seconds: float = Field(default=20.0, gt=0)
+
+    @property
+    def web_allowed_origins_list(self) -> list[str]:
+        """`web_allowed_origins` split into a clean list.
+
+        Kept as a plain comma-separated string in the environment
+        because pydantic-settings would otherwise insist on JSON for a
+        `list[str]` field, which is awkward to write in a `.env` file.
+        """
+
+        return [o.strip() for o in self.web_allowed_origins.split(",") if o.strip()]
+
+    @property
+    def auth_secret_is_placeholder(self) -> bool:
+        return self.auth_token_secret.startswith("replace-with")
 
 
 @lru_cache(maxsize=1)

@@ -158,3 +158,57 @@ class RepositoryError(IntegrationError):
 
 class RecordNotFoundError(RepositoryError):
     """A repository lookup found no matching row."""
+
+
+# --- Web service: auth ----------------------------------------------------
+
+
+class AuthError(JobPilotError):
+    """Base class for sign-in and access-token failures."""
+
+
+class InvalidCodeError(AuthError):
+    """The one-time code was wrong, unknown, or already used."""
+
+
+class CodeExpiredError(AuthError):
+    """The one-time code is older than its ten-minute lifetime."""
+
+
+class TooManyAttemptsError(AuthError):
+    """Too many wrong guesses (or code requests) for one email address."""
+
+
+class InvalidTokenError(AuthError):
+    """A bearer token was malformed, tampered with, or expired."""
+
+
+# --- Resume tailoring -------------------------------------------------------
+
+
+class ResumeError(JobPilotError):
+    """Base class for resume upload, parsing, and tailoring failures."""
+
+
+class UnsupportedFileTypeError(ResumeError):
+    """The uploaded file is not a PDF or DOCX (judged by magic bytes)."""
+
+
+class FileTooLargeError(ResumeError):
+    """The uploaded file exceeds the configured size limit."""
+
+
+class ResumeParseError(ResumeError):
+    """Text could not be extracted from, or structured out of, a resume."""
+
+
+class ResumeNotReadyError(ResumeError):
+    """The resume is still parsing (or failed) and cannot be used yet."""
+
+
+class TailoringNotReadyError(ResumeError):
+    """The tailoring is still running (or failed), so it cannot be exported."""
+
+
+class RequestRejectedError(JobPilotError):
+    """A request was well-formed JSON but violates a business rule."""
