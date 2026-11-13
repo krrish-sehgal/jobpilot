@@ -11,15 +11,31 @@ export interface AppliedResume {
 }
 
 /**
+ * Stable reorder: items named in `wanted` (lower-case) come first in that order; items the list
+ * doesn't mention keep their relative order at the end.
+ */
+export function sortByWanted<T>(items: T[], wanted: string[], nameOf: (item: T) => string): T[] {
+  const rank = (item: T) => {
+    const i = wanted.indexOf(nameOf(item).toLowerCase());
+    return i === -1 ? wanted.length : i;
+  };
+  return items
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => rank(a.item) - rank(b.item) || a.index - b.index)
+    .map((x) => x.item);
+}
+
+/**
  * Produces the resume as it would look with the *accepted* suggestions applied.
  * Pure, so the live preview, the mock exporter and tests share one definition.
  *
- * Contract note: for `reorder_section`, `proposed` is the new section order as a
- * comma-separated list ("skills, experience, projects, education").
+ * Contract (docs/web-api.md, "Suggestion semantics"): for `reorder_section`, `section` is
+ * "skills" or "projects" and `proposed` lists that section's items (skill names or project
+ * names), comma-separated, most relevant first. Section order itself never changes.
  */
 export function applySuggestions(base: ResumeSections, suggestions: Suggestion[]): AppliedResume {
   const sections: ResumeSections = structuredClone(base);
-  let order = [...DEFAULT_ORDER];
+  const order = [...DEFAULT_ORDER];
   const changed = new Set<string>();
 
   for (const s of suggestions) {
@@ -44,8 +60,9 @@ export function applySuggestions(base: ResumeSections, suggestions: Suggestion[]
         }
         break;
       case "reorder_section": {
-        const wanted = s.proposed.split(",").map((p) => p.trim()).filter((p): p is SectionKey => DEFAULT_ORDER.includes(p as SectionKey));
-        order = [...wanted, ...order.filter((o) => !wanted.includes(o))];
+        const wanted = s.proposed.split(",").map((item) => item.trim().toLowerCase()).filter(Boolean);
+        if (s.section === "skills") sections.skills = sortByWanted(sections.skills, wanted, (skill) => skill);
+        else if (s.section === "projects") sections.projects = sortByWanted(sections.projects, wanted, (project) => project.name);
         break;
       }
     }

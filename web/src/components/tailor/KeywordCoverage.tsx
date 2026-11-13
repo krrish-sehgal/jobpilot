@@ -3,10 +3,10 @@ import type { KeywordCoverage as Keyword } from "@/lib/api/types";
 import { cn } from "@/lib/cn";
 
 function Chip({ k }: { k: Keyword }) {
-  // Three states: already on the resume, will be covered by the edits, still missing.
+  // Three states: already on the resume, covered if the suggested (non-rejected) edits are kept, still missing.
   const state = k.found_in_resume ? "have" : k.covered_after ? "added" : "missing";
   const Icon = state === "have" ? Check : state === "added" ? Plus : Minus;
-  const text = { have: "On your resume", added: "Covered by your edits", missing: "Missing" }[state];
+  const text = { have: "On your resume", added: "Covered by suggested edits", missing: "Missing" }[state];
   return (
     <li
       title={text}

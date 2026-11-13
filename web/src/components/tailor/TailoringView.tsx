@@ -69,10 +69,16 @@ export function TailoringView({ tailoringId }: { tailoringId: string }) {
             <aside aria-labelledby="prev-h" className="space-y-4 lg:sticky lg:top-4 lg:self-start">
               <div className="rounded-xl border border-line bg-surface p-5">
                 <h2 id="prev-h" className="mb-4 font-display text-xl">Live preview</h2>
-                {t.preview ? <ResumeSectionsView sections={t.preview.sections} order={t.preview.order} changed={t.preview.changed} /> : <Skeleton className="h-64" />}
+                {t.preview ? (
+                  <ResumeSectionsView sections={t.preview.sections} order={t.preview.order} changed={t.preview.changed} />
+                ) : t.previewUnavailable ? (
+                  <p className="text-sm text-muted">Preview unavailable. You can still review the edits and export.</p>
+                ) : (
+                  <Skeleton className="h-64" />
+                )}
                 <p className="mt-4 text-xs text-muted">Highlighted text comes from edits you accepted.</p>
               </div>
-              <ExportButtons tailoringId={tailoring.id} />
+              <ExportButtons tailoringId={tailoring.id} settled={t.settled} />
             </aside>
           </div>
         </>

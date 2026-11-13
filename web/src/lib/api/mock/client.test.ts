@@ -27,6 +27,7 @@ describe("MockApiClient", () => {
 
   it("runs a tailoring from running to ready with suggestions", async () => {
     const [resume] = await api.listResumes();
+    const resumeSkills = [...(await api.getResume(resume!.id)).sections!.skills];
     const { tailoringId } = await api.createTailoring({ resume_id: resume!.id, job_id: "job-lumenfold-backend" });
     expect((await api.getTailoring(tailoringId)).status).toBe("running");
     await new Promise((r) => setTimeout(r, 3000));
@@ -34,5 +35,9 @@ describe("MockApiClient", () => {
     expect(t.status).toBe("ready");
     expect(t.suggestions.length).toBeGreaterThanOrEqual(5);
     expect(t.score_after).toBeGreaterThan(t.score_before);
+    const reorder = t.suggestions.find((x) => x.kind === "reorder_section")!;
+    expect(reorder.section).toBe("skills");
+    expect(reorder.target_id).toBe("skills");
+    expect(reorder.proposed.split(", ").sort()).toEqual(resumeSkills.sort());
   }, 10_000);
 });

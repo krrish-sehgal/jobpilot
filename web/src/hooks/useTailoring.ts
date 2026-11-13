@@ -24,6 +24,7 @@ export function useTailoring(tailoringId: string) {
   const [tailoring, setTailoring] = useState<Tailoring | null>(null);
   const [resume, setResume] = useState<Resume | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [resumeFailed, setResumeFailed] = useState(false);
 
   useEffect(() => {
     if (poll.data) setTailoring(poll.data);
@@ -33,7 +34,11 @@ export function useTailoring(tailoringId: string) {
   useEffect(() => {
     if (!resumeId) return;
     let cancelled = false;
-    api.getResume(resumeId).then((r) => !cancelled && setResume(r)).catch(() => undefined);
+    setResumeFailed(false);
+    api
+      .getResume(resumeId)
+      .then((r) => !cancelled && setResume(r))
+      .catch(() => !cancelled && setResumeFailed(true)); // surfaced as "Preview unavailable"
     return () => { cancelled = true; };
   }, [resumeId]);
 
@@ -43,21 +48,25 @@ export function useTailoring(tailoringId: string) {
   const decide = useCallback((ids: string[], decision: Decision) => {
     if (ids.length === 0) return;
     setActionError(null);
-    let snapshot: Tailoring | null = null;
-    setTailoring((cur) => {
-      snapshot = cur;
-      return cur && { ...cur, suggestions: cur.suggestions.map((s) => (ids.includes(s.id) ? { ...s, decision } : s)) };
-    });
+    setTailoring((cur) => cur && { ...cur, suggestions: cur.suggestions.map((s) => (ids.includes(s.id) ? { ...s, decision } : s)) });
     queue.current = queue.current.then(async () => {
       try {
         const next = await api.submitDecisions(tailoringId, decision === "accepted" ? ids : [], decision === "rejected" ? ids : []);
         setTailoring(next);
       } catch (e) {
-        setTailoring(snapshot); // roll back the optimistic change
         setActionError(describeError(e));
+        // Don't guess the old state back: earlier queued decisions may have succeeded, so ask the server.
+        try {
+          setTailoring(await api.getTailoring(tailoringId));
+        } catch {
+          /* keep the optimistic state; the error notice above tells the user something is off */
+        }
       }
     });
   }, [tailoringId]);
+
+  /** Resolves once every queued decision request has finished (success or failure). Call before exporting. */
+  const settled = useCallback((): Promise<unknown> => queue.current, []);
 
   const pendingIds = useMemo(() => tailoring?.suggestions.filter((s) => s.decision === "pending").map((s) => s.id) ?? [], [tailoring]);
 
@@ -66,9 +75,14 @@ export function useTailoring(tailoringId: string) {
     [tailoring, resume],
   );
 
+  // Sections are null when the resume isn't "ready"; a failed load is the same user-facing problem.
+  const previewUnavailable = resumeFailed || (resume !== null && resume.sections === null);
+
   return {
     tailoring,
     preview,
+    previewUnavailable,
+    settled,
     error: poll.error,
     retry: poll.retry,
     actionError,

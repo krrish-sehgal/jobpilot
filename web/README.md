@@ -33,7 +33,7 @@ Mock mode (`src/lib/api/mock/`) is realistic enough to demo every state:
 - Demo hooks: sign in with any email and any 6-digit code except `000000`; type `/fail` in a chat message to see the
   retryable error state (the retry, sent with a fresh `client_message_id`, succeeds); upload a file whose name contains `fail` to see a failed parse.
 - State is a module singleton (`db.ts`): it survives navigation and resets on reload.
-- Mock "Export DOCX" produces RTF (a real .docx needs zipping); PDF export is a small hand-built valid PDF.
+- Mock "Export DOCX" produces RTF (a real .docx needs zipping), so the button reads "Export Word (RTF)" in mock mode; PDF export is a small hand-built valid PDF.
 
 ## Layout
 
@@ -101,7 +101,8 @@ which flips auth to anonymous, and `RequireAuth` (used by `app/app/layout.tsx`) 
 3. The score meter, keyword chips (required/preferred; on resume / covered by edits / missing) and suggestion cards render.
    Each card shows a word diff (`lib/diff.ts`, inline or side-by-side).
 4. Accept / Reject / Accept all update the UI optimistically, then `POST /tailorings/{id}/decisions` (requests are
-   chained so responses can't land out of order; a failure rolls back). The response replaces local state.
+   chained so responses can't land out of order; a failure reloads the tailoring from the server). The response
+   replaces local state. Export waits for the queue (`settled()`) so it never races a pending decision.
 5. The live preview is `applySuggestions(resume.sections, suggestions)` (accepted edits only), highlighted where changed.
 6. Export downloads via `fetch` (needs the auth header) and a temporary object URL.
 
@@ -109,8 +110,9 @@ which flips auth to anonymous, and `RequireAuth` (used by `app/app/layout.tsx`) 
 
 - **`score_after`** is not defined precisely. The UI treats it as the server's projection with all non-rejected
   suggestions applied, and always takes it from the latest server response. The mock computes it that way.
-- **`reorder_section`**: the contract doesn't say what `proposed` holds. The UI assumes a comma-separated section
-  order (`"summary, skills, experience, projects, education"`); unknown names are ignored.
+- **`reorder_section`**: `section` is `skills` or `projects`; `proposed` lists that section's items comma-separated,
+  most relevant first (see "Suggestion semantics" in `docs/web-api.md`). Matching is case-insensitive and items the
+  list doesn't mention keep their relative order at the end. Sections themselves are never reordered.
 - **Retrying a failed turn**: reposting a `client_message_id` returns the original (failed) turn, so after a terminal
   `error` event the client retries with a fresh id; after a dropped connection with no terminal event it reuses the id.
 - **`rewrite_bullet.target_id`** is matched against bullet ids in both experience and projects.

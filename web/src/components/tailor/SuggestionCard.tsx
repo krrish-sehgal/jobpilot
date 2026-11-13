@@ -9,7 +9,7 @@ const kindLabel: Record<Suggestion["kind"], string> = {
   rewrite_bullet: "Rewrite bullet",
   rewrite_summary: "Rewrite summary",
   add_skill: "Add skill",
-  reorder_section: "Reorder sections",
+  reorder_section: "Reorder items",
 };
 
 /** One proposed edit with its reason, a diff, and Accept / Reject. */

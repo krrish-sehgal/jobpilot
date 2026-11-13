@@ -11,7 +11,7 @@ function Bar({ label, value, tone }: { label: string; value: number; tone: strin
   );
 }
 
-/** Match score before and after. `after` is the projection with all non-rejected edits applied. */
+/** Match score before and after. `after` is the projection with every non-rejected edit applied (pending ones included). */
 export function ScoreMeter({ before, after }: { before: number; after: number }) {
   const delta = after - before;
   return (
@@ -24,7 +24,7 @@ export function ScoreMeter({ before, after }: { before: number; after: number })
       </div>
       <div className="mt-4 space-y-3">
         <Bar label="Original resume" value={before} tone="bg-muted" />
-        <Bar label="With your accepted edits" value={after} tone="bg-good" />
+        <Bar label="If you keep the remaining edits" value={after} tone="bg-good" />
       </div>
     </section>
   );

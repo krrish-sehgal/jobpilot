@@ -1,4 +1,5 @@
 import type { KeywordCoverage, ResumeSections, Suggestion, Tailoring } from "../types";
+import { sortByWanted } from "@/lib/resumeApply";
 import { db, jobById, type MockResume } from "./db";
 import { newId, nowIso } from "./util";
 
@@ -37,14 +38,14 @@ function extractTerms(jd: string): string[] {
   return hits.length >= 3 ? hits : [...hits, ...["Python", "PostgreSQL", "AWS", "Kafka"].filter((t) => !hits.includes(t))].slice(0, 6);
 }
 
-function buildSuggestions(sections: ResumeSections, missing: string[], jobTitle: string): Suggestion[] {
+function buildSuggestions(sections: ResumeSections, terms: string[], missing: string[], jobTitle: string): Suggestion[] {
   const kw = (i: number) => missing[i] ?? missing[0] ?? "automated testing";
   const mk = (s: Omit<Suggestion, "id" | "decision">): Suggestion => ({ ...s, id: newId(), decision: "pending" });
   const bullet = (id: string) => sections.experience.flatMap((e) => e.bullets).find((b) => b.id === id)?.text ?? null;
 
   const out: Suggestion[] = [
     mk({
-      kind: "rewrite_summary", target_id: "summary", section: "summary", original: sections.summary,
+      kind: "rewrite_summary", target_id: null, section: "summary", original: sections.summary,
       proposed: `Backend engineer with three years of experience building and operating production services, now targeting a ${jobTitle} role. Strongest in ${sections.skills.slice(0, 2).join(" and ")}, with growing depth in ${missing.slice(0, 2).join(" and ") || "distributed systems"}.`,
       reason: "Names the target role and leads with the skills the posting asks for first.",
       keywords_added: missing.slice(0, 2),
@@ -71,9 +72,9 @@ function buildSuggestions(sections: ResumeSections, missing: string[], jobTitle:
   out.push(
     mk({
       kind: "reorder_section", target_id: "skills", section: "skills",
-      original: "summary, experience, projects, skills, education",
-      proposed: "summary, skills, experience, projects, education",
-      reason: "Your skills line up well with this posting, so recruiters should see it earlier.", keywords_added: [],
+      original: sections.skills.join(", "),
+      proposed: sortByWanted(sections.skills, terms.map(lower), (skill) => skill).join(", "),
+      reason: "Puts the skills this posting asks for first, so they are seen earlier.", keywords_added: [],
     }),
   );
   return out;
@@ -99,7 +100,7 @@ export function startTailoring(resume: MockResume, input: { jobId?: string; jobD
     id, resumeId: resume.summary.id, jobId: job?.job_id ?? null, jobTitle, company: job?.company ?? null,
     createdAt: nowIso(), readyAt: Date.now() + RUN_MS, keywordSeeds,
     scoreBefore: Math.round(35 + (found / total) * 40),
-    suggestions: buildSuggestions(resume.sections, missing, jobTitle),
+    suggestions: buildSuggestions(resume.sections, terms, missing, jobTitle),
   });
   return id;
 }

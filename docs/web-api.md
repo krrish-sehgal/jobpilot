@@ -74,7 +74,7 @@ Each event has an `event:` name and a JSON `data:` line.
 type JobCard = { job_id: string; title: string; company: string; location_text: string | null;
   location_tier: LocationTier; seniority_band: SeniorityBand; role_category: RoleCategory;
   skills: string[]; description_preview: string; compensation_text: string | null;
-  apply_url: string; match_score: number; match_reasons: string[]; posted_at: string | null;
+  apply_url: string; match_score: number /* integer 0-100 */; match_reasons: string[]; posted_at: string | null;
   is_saved: boolean }
 type JobDetail = JobCard & { description: string; employment_type: EmploymentType;
   min_years_experience: number }
@@ -129,6 +129,16 @@ type Suggestion = { id: string; kind: "rewrite_bullet" | "rewrite_summary" | "ad
   original: string | null; proposed: string; reason: string; keywords_added: string[];
   decision: "pending" | "accepted" | "rejected" }
 ```
+
+Suggestion semantics:
+
+- `rewrite_bullet`: `target_id` is the bullet id (experience or project bullet); `proposed` replaces its text.
+- `rewrite_summary`: `target_id` is null; `proposed` is the full new summary.
+- `add_skill`: `target_id` is null; `proposed` is one skill appended to `skills`.
+- `reorder_section`: `section` is `"skills"` or `"projects"`, `target_id` equals that section name, and
+  `proposed` is the same items (skill names or project names), comma-separated, most relevant first.
+- `score_after` is the projected score with every suggestion that is not `rejected` applied;
+  it is recomputed whenever decisions change.
 
 ## Errors
 
