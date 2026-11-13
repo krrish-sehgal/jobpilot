@@ -89,9 +89,10 @@ def test_score_is_weighted_and_bounded():
     keywords = JobKeywords(required=("python", "kubernetes"), preferred=("redis",))
     entries = compute_coverage(keywords, sections)
     breakdown = score_match(sections, entries, SeniorityBand.SENIOR, today=TODAY)
-    assert breakdown.required == 0.5 and breakdown.preferred == 1.0
+    assert breakdown.required == 0.5  # python listed, kubernetes absent
+    assert breakdown.preferred == 0.5  # redis is only mentioned in a bullet
     assert breakdown.seniority == 1.0 and breakdown.recency == 1.0
-    assert breakdown.total == pytest.approx(100 * (0.55 * 0.5 + 0.15 + 0.15 + 0.15), abs=0.05)
+    assert breakdown.total == pytest.approx(100 * (0.55 * 0.5 + 0.15 * 0.5 + 0.15 + 0.15), abs=0.05)
     assert 0 <= breakdown.total <= 100
 
 
@@ -103,16 +104,14 @@ def test_missing_components_are_dropped_not_awarded():
     assert breakdown.total == 100.0  # python covered, senior fit, current role
 
 
-def test_after_flag_reads_covered_after():
+def test_listing_a_demonstrated_skill_raises_the_score():
     sections = sample_sections()
-    entries = compute_coverage(
-        JobKeywords(required=("python", "kubernetes"), preferred=()), sections
-    )
+    entries = compute_coverage(JobKeywords(required=("python", "jenkins"), preferred=()), sections)
     before = score_match(sections, entries, SeniorityBand.SENIOR, today=TODAY)
-    entries[1].covered_after = True
-    after = score_match(sections, entries, SeniorityBand.SENIOR, after=True, today=TODAY)
+    sections.skills.append("Jenkins")
+    after = score_match(sections, entries, SeniorityBand.SENIOR, today=TODAY)
+    assert before.required == 0.75 and after.required == 1.0
     assert after.total > before.total
-    assert after.required == 1.0
 
 
 def test_default_weights_sum_to_one():

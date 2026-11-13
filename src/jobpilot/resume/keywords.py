@@ -223,16 +223,39 @@ def compute_coverage(keywords: JobKeywords, sections: ResumeSections) -> list[Ke
     return entries
 
 
-def coverage_fraction(
-    entries: Iterable[KeywordEntry],
-    importance: KeywordImportance,
-    *,
-    after: bool = False,
-) -> float | None:
-    """Share of keywords of one importance that are present; `None` if there are none."""
+#: How much a keyword counts toward the match score, by where it appears.
+LISTED_WEIGHT = 1.0
+MENTIONED_WEIGHT = 0.5
 
-    relevant = [e for e in entries if e.importance == importance]
-    if not relevant:
+
+def keyword_strength(sections: ResumeSections, term: str) -> float:
+    """How prominently the resume presents `term`: 1.0, 0.5, or 0.0.
+
+    Recruiters and ATS keyword filters weight a skills list or summary
+    far more than a word buried in a bullet, and a candidate who *used*
+    Redis but never listed it is easy to miss. So a term that is listed
+    (skills, summary, project tech) counts fully, one that is only
+    mentioned in experience text counts half, and an absent one counts
+    nothing. This is also why `add_skill` suggestions move the score:
+    they promote a demonstrated skill from "mentioned" to "listed".
+    """
+
+    listed = "\n".join(
+        [*sections.skills, sections.summary or "", *(t for p in sections.projects for t in p.tech)]
+    )
+    if contains_term(listed, term):
+        return LISTED_WEIGHT
+    if contains_term(resume_text(sections), term):
+        return MENTIONED_WEIGHT
+    return 0.0
+
+
+def weighted_coverage(
+    sections: ResumeSections, entries: Iterable[KeywordEntry], importance: KeywordImportance
+) -> float | None:
+    """Mean `keyword_strength` over keywords of one importance; `None` if there are none."""
+
+    terms = [e.term for e in entries if e.importance == importance]
+    if not terms:
         return None
-    hits = sum(1 for e in relevant if (e.covered_after if after else e.found_in_resume))
-    return hits / len(relevant)
+    return sum(keyword_strength(sections, t) for t in terms) / len(terms)

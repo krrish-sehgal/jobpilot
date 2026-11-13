@@ -10,10 +10,11 @@ from jobpilot.resume.keywords import (
     JobKeywords,
     compute_coverage,
     contains_term,
-    coverage_fraction,
     extract_job_keywords,
+    keyword_strength,
     normalize_term,
     resume_text,
+    weighted_coverage,
 )
 from jobpilot.resume.models import KeywordImportance
 from tests.resume_fixtures import sample_sections
@@ -77,9 +78,20 @@ def test_coverage_marks_found_and_missing_terms():
         "terraform": False,
     }
     assert all(e.covered_after == e.found_in_resume for e in entries)
-    assert coverage_fraction(entries, KeywordImportance.REQUIRED) == pytest.approx(2 / 3)
-    assert coverage_fraction(entries, KeywordImportance.PREFERRED) == 0.5
-    assert coverage_fraction([], KeywordImportance.REQUIRED) is None
+    sections = sample_sections()
+    # python and postgres are listed (1.0); kubernetes is absent (0.0)
+    assert weighted_coverage(sections, entries, KeywordImportance.REQUIRED) == pytest.approx(2 / 3)
+    # redis is only mentioned in a bullet (0.5); terraform is absent
+    assert weighted_coverage(sections, entries, KeywordImportance.PREFERRED) == 0.25
+    assert weighted_coverage(sections, [], KeywordImportance.REQUIRED) is None
+
+
+def test_keyword_strength_distinguishes_listed_mentioned_absent():
+    sections = sample_sections()
+    assert keyword_strength(sections, "python") == 1.0  # skills list
+    assert keyword_strength(sections, "elasticsearch") == 1.0  # project tech
+    assert keyword_strength(sections, "jenkins") == 0.5  # bullet only
+    assert keyword_strength(sections, "kubernetes") == 0.0
 
 
 def _llm(payload) -> FakeLLMClient:

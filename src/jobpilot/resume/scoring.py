@@ -7,6 +7,8 @@ they accept a suggestion, and tests can pin it down.
     score = 100 * weighted mean of
         required keyword coverage   (weight 0.55)
         preferred keyword coverage  (weight 0.15)
+          (a keyword counts 1.0 if listed, 0.5 if only mentioned in a
+           bullet, 0 if absent; see `keywords.keyword_strength`)
         seniority fit               (weight 0.15)
         recency of relevant work    (weight 0.15)
 
@@ -24,7 +26,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime
 
 from jobpilot.models import SENIORITY_ORDER, SeniorityBand, seniority_band_for_years
-from jobpilot.resume.keywords import contains_term, coverage_fraction
+from jobpilot.resume.keywords import contains_term, weighted_coverage
 from jobpilot.resume.models import KeywordEntry, KeywordImportance, ResumeSections
 
 _MONTHS = {
@@ -187,20 +189,19 @@ def score_match(
     entries: Sequence[KeywordEntry],
     job_band: SeniorityBand | None,
     *,
-    after: bool = False,
     today: date | None = None,
     weights: ScoreWeights | None = None,
 ) -> ScoreBreakdown:
     """Score `sections` against the job described by `entries`.
 
-    `after=True` reads each entry's `covered_after` flag instead of
-    `found_in_resume`; the caller passes the sections with accepted
-    suggestions applied so that the recency component sees them too.
+    Only each entry's term and importance are used; coverage is measured
+    on `sections` itself. To score a hypothetical "after" resume, pass
+    the sections with suggestions applied.
     """
 
     weights = weights or ScoreWeights()
-    required = coverage_fraction(entries, KeywordImportance.REQUIRED, after=after)
-    preferred = coverage_fraction(entries, KeywordImportance.PREFERRED, after=after)
+    required = weighted_coverage(sections, entries, KeywordImportance.REQUIRED)
+    preferred = weighted_coverage(sections, entries, KeywordImportance.PREFERRED)
     seniority = seniority_fit(candidate_band(sections, today=today), job_band)
     recency = recency_of_relevant_experience(sections, [e.term for e in entries], today=today)
 
