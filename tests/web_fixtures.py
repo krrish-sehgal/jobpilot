@@ -23,7 +23,7 @@ from jobpilot.web.app import create_web_app
 from jobpilot.web.auth import RecordingCodeSender
 from jobpilot.web.deps import WebContainer, build_container
 from tests.conftest import make_job_record
-from tests.resume_fixtures import sample_resume_json
+from tests.resume_fixtures import make_pdf, sample_resume_json
 
 ORIGIN = "https://app.example.com"
 FINAL_REPLY = (
@@ -121,3 +121,55 @@ def parse_sse(text: str) -> list[tuple[str, dict]]:
         data = next(line[6:] for line in lines if line.startswith("data: "))
         events.append((name, json.loads(data)))
     return events
+
+
+# --- shared route-test helpers ------------------------------------------------
+
+API = "/api/v1"
+
+
+def assert_error(response, status: int, code: str) -> None:
+    assert response.status_code == status, response.text
+    body = response.json()
+    assert set(body) == {"error"} and set(body["error"]) == {"code", "message"}
+    assert body["error"]["code"] == code
+
+
+def upload(web: Web, auth, data=None, name="cv.pdf"):
+    response = web.client.post(
+        f"{API}/resumes", headers=auth, files={"file": (name, data or make_pdf())}
+    )
+    assert response.status_code == 202, response.text
+    return response.json()["resume_id"]
+
+
+def new_conversation(web: Web, auth) -> str:
+    response = web.client.post(f"{API}/conversations", json={}, headers=auth)
+    assert response.status_code == 201
+    assert set(response.json()) == {"id", "title", "last_message_preview", "updated_at"}
+    return response.json()["id"]
+
+
+def post_message(web: Web, auth, conversation_id, body="find me remote backend roles", cmid=None):
+    cmid = cmid or "7b0c3f9e-6f7a-4d6a-9f0e-1c2d3e4f5a6b"
+    return web.client.post(
+        f"{API}/conversations/{conversation_id}/messages",
+        headers=auth,
+        json={"body": body, "client_message_id": cmid},
+    )
+
+
+def stream(web: Web, auth, conversation_id, turn_id):
+    response = web.client.get(
+        f"{API}/conversations/{conversation_id}/turns/{turn_id}/stream", headers=auth
+    )
+    assert response.headers["content-type"].startswith("text/event-stream")
+    return parse_sse(response.text)
+
+
+def start_tailoring(web: Web, auth, **payload):
+    resume_id = payload.pop("resume_id", None) or upload(web, auth)
+    response = web.client.post(
+        f"{API}/tailorings", headers=auth, json={"resume_id": resume_id, **payload}
+    )
+    return resume_id, response

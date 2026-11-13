@@ -109,3 +109,15 @@ def make_job_record(
         candidate_profile_text=candidate_profile_text,
         posted_at=posted_at or (datetime.now(UTC) - timedelta(days=1)),
     )
+
+
+@pytest.fixture
+def web():
+    from tests.web_fixtures import build_web
+
+    return build_web()
+
+
+@pytest.fixture
+def auth(web) -> dict[str, str]:
+    return web.sign_in()
