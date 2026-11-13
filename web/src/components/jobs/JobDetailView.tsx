@@ -9,6 +9,7 @@ import type { JobDetail } from "@/lib/api/types";
 import { categoryLabel, employmentLabel, seniorityLabel, tierLabel } from "@/lib/labels";
 import { timeAgo } from "@/lib/format";
 import { Markdown } from "@/lib/markdown";
+import { isSafeExternalUrl } from "@/lib/url";
 import { Badge } from "@/components/ui/Badge";
 import { buttonClasses } from "@/components/ui/Button";
 import { ErrorNotice } from "@/components/ui/ErrorNotice";
@@ -55,13 +56,17 @@ export function JobDetailView({ jobId }: { jobId: string }) {
           </header>
 
           <div className="mt-6 flex flex-wrap gap-2">
-            <Link href={`/app/tailor/new?jobId=${job.job_id}`} className={buttonClasses("primary", "md")}>
+            <Link href={`/app/tailor/new?jobId=${encodeURIComponent(job.job_id)}`} className={buttonClasses("primary", "md")}>
               <Wand2 className="h-4 w-4" aria-hidden /> Tailor my resume for this job
             </Link>
-            <a href={job.apply_url} target="_blank" rel="noopener noreferrer" className={buttonClasses("secondary", "md")}>
-              Apply <ExternalLink className="h-4 w-4" aria-hidden />
-              <span className="sr-only">(opens in a new tab)</span>
-            </a>
+            {isSafeExternalUrl(job.apply_url) ? (
+              <a href={job.apply_url} target="_blank" rel="noopener noreferrer" className={buttonClasses("secondary", "md")}>
+                Apply <ExternalLink className="h-4 w-4" aria-hidden />
+                <span className="sr-only">(opens in a new tab)</span>
+              </a>
+            ) : (
+              <span className="inline-flex items-center px-2 text-sm text-muted">No application link available</span>
+            )}
             <SaveButton jobId={job.job_id} initialSaved={job.is_saved} />
           </div>
 

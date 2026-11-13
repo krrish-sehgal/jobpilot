@@ -89,18 +89,18 @@ export class HttpApiClient implements ApiClient {
     return this.request("/conversations", s.conversationSummary, this.json("POST", {}));
   }
   listMessages(id: string) {
-    return this.request(`/conversations/${id}/messages`, s.chatMessage.array());
+    return this.request(`/conversations/${encodeURIComponent(id)}/messages`, s.chatMessage.array());
   }
   sendMessage(id: string, body: string, clientMessageId: string) {
     return this.request(
-      `/conversations/${id}/messages`,
+      `/conversations/${encodeURIComponent(id)}/messages`,
       s.sentMessage,
       this.json("POST", { body, client_message_id: clientMessageId }),
     );
   }
 
   async *streamTurn(id: string, turnId: string, signal: AbortSignal) {
-    const res = await this.raw(`/conversations/${id}/turns/${turnId}/stream`, {
+    const res = await this.raw(`/conversations/${encodeURIComponent(id)}/turns/${encodeURIComponent(turnId)}/stream`, {
       headers: { Accept: "text/event-stream" },
       signal,
     });
@@ -122,13 +122,13 @@ export class HttpApiClient implements ApiClient {
   // ---------- jobs ----------
 
   getJob(id: string) {
-    return this.request(`/jobs/${id}`, s.jobDetail);
+    return this.request(`/jobs/${encodeURIComponent(id)}`, s.jobDetail);
   }
   saveJob(id: string) {
-    return this.noContent(`/jobs/${id}/save`, { method: "POST" });
+    return this.noContent(`/jobs/${encodeURIComponent(id)}/save`, { method: "POST" });
   }
   unsaveJob(id: string) {
-    return this.noContent(`/jobs/${id}/save`, { method: "DELETE" });
+    return this.noContent(`/jobs/${encodeURIComponent(id)}/save`, { method: "DELETE" });
   }
   listSavedJobs() {
     return this.request("/saved-jobs", s.jobCard.array());
@@ -177,10 +177,10 @@ export class HttpApiClient implements ApiClient {
     return this.request("/resumes", s.resumeSummary.array());
   }
   getResume(id: string) {
-    return this.request(`/resumes/${id}`, s.resume);
+    return this.request(`/resumes/${encodeURIComponent(id)}`, s.resume);
   }
   makePrimary(id: string) {
-    return this.noContent(`/resumes/${id}/primary`, { method: "POST" });
+    return this.noContent(`/resumes/${encodeURIComponent(id)}/primary`, { method: "POST" });
   }
 
   // ---------- tailoring ----------
@@ -190,14 +190,14 @@ export class HttpApiClient implements ApiClient {
     return { tailoringId: ack.tailoring_id };
   }
   getTailoring(id: string) {
-    return this.request(`/tailorings/${id}`, s.tailoring);
+    return this.request(`/tailorings/${encodeURIComponent(id)}`, s.tailoring);
   }
   submitDecisions(id: string, accepted: string[], rejected: string[]) {
-    return this.request(`/tailorings/${id}/decisions`, s.tailoring, this.json("POST", { accepted, rejected }));
+    return this.request(`/tailorings/${encodeURIComponent(id)}/decisions`, s.tailoring, this.json("POST", { accepted, rejected }));
   }
 
   async exportTailoring(id: string, format: "pdf" | "docx") {
-    const res = await this.raw(`/tailorings/${id}/export?format=${format}`);
+    const res = await this.raw(`/tailorings/${encodeURIComponent(id)}/export?format=${format}`);
     const disposition = res.headers.get("Content-Disposition") ?? "";
     const match = /filename="?([^";]+)"?/i.exec(disposition);
     return { blob: await res.blob(), fileName: match?.[1] ?? `tailored-resume.${format}` };

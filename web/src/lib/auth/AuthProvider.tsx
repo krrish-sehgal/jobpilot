@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { api } from "@/lib/api";
 import type { User } from "@/lib/api/types";
-import { clearToken, getToken, onSessionLost, setToken } from "./token";
+import { clearToken, getExpiry, getToken, onSessionLost, setToken } from "./token";
 
 type Status = "loading" | "authenticated" | "anonymous";
 
@@ -73,6 +73,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setStatus("anonymous");
   }, []);
+
+  // Log out when the token expires, instead of waiting for the next request to fail with a 401.
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    const expiresAt = getExpiry();
+    if (expiresAt === null) return;
+    // setTimeout caps at ~24.8 days; clamp so a far-future expiry can't fire immediately.
+    const delay = Math.min(Math.max(expiresAt - Date.now(), 0), 2 ** 31 - 1);
+    const timer = setTimeout(logout, delay);
+    return () => clearTimeout(timer);
+  }, [status, logout]);
 
   const value = useMemo(() => ({ status, user, requestCode, verifyCode, logout }), [status, user, requestCode, verifyCode, logout]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

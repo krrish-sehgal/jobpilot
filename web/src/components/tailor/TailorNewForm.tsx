@@ -53,7 +53,7 @@ export function TailorNewForm() {
     try {
       const input = source === "job" && jobId ? { resume_id: resumeId, job_id: jobId } : { resume_id: resumeId, job_description_text: text.trim() };
       const { tailoringId } = await api.createTailoring(input);
-      router.push(`/app/tailor/${tailoringId}`);
+      router.push(`/app/tailor/${encodeURIComponent(tailoringId)}`);
     } catch (err) {
       setError(describeError(err));
       setBusy(false);

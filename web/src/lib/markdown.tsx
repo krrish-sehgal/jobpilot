@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { isSafeExternalUrl } from "@/lib/url";
 
 /*
   A deliberately tiny markdown renderer for assistant replies: paragraphs,
@@ -25,7 +26,9 @@ export type Block =
 const TOKEN = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)\s]+\)|\*[^*\s][^*]*\*)/;
 
 export function isSafeHref(href: string): boolean {
-  return /^https?:\/\//i.test(href) || (href.startsWith("/") && !href.startsWith("//"));
+  // In-app paths must start with a single "/": "//host" and "/\host" are treated by browsers as other origins.
+  const isAppPath = href.startsWith("/") && !/^\/[\/\\]/.test(href);
+  return isSafeExternalUrl(href) || isAppPath;
 }
 
 export function parseInline(src: string): Inline[] {

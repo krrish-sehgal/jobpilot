@@ -66,7 +66,7 @@ export function ChatView({ conversationId }: { conversationId: string | null }) 
       const conv = await api.createConversation();
       upsert(conv);
       setPending(conv.id, { body, clientMessageId: uuid() });
-      router.push(`/app/chat/${conv.id}`);
+      router.push(`/app/chat/${encodeURIComponent(conv.id)}`);
     } catch (e) {
       setStartError(describeError(e));
       setStarting(false);

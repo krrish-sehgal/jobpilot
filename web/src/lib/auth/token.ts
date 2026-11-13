@@ -3,8 +3,9 @@
  *
  * The token lives in a module variable (fast, never serialized) and is mirrored
  * to sessionStorage so a page refresh doesn't log you out, while closing the
- * tab does. We deliberately avoid localStorage (long-lived, readable by any
- * script on the origin) and cookies (we'd need CSRF protection).
+ * tab does. sessionStorage gives a tab-scoped lifetime; it is equally exposed
+ * to XSS as localStorage, so we rely on never injecting HTML (see lib/markdown.tsx).
+ * We avoid cookies because we'd need CSRF protection.
  */
 const KEY = "jobpilot.session";
 
@@ -32,6 +33,12 @@ export function getToken(): string | null {
     return null;
   }
   return memory?.token ?? null;
+}
+
+/** When the stored token expires (epoch ms), or null if there is none. */
+export function getExpiry(): number | null {
+  if (!getToken() || !memory) return null;
+  return Date.parse(memory.expiresAt);
 }
 
 export function setToken(token: string, expiresAt: string): void {

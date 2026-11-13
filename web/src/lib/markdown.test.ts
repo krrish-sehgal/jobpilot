@@ -21,6 +21,15 @@ describe("parseInline", () => {
     expect(isSafeHref("https://ok.example")).toBe(true);
   });
 
+  it("rejects protocol-relative and backslash paths, accepts in-app paths", () => {
+    expect(isSafeHref("//evil.com")).toBe(false);
+    expect(isSafeHref("/\\evil.com")).toBe(false);
+    expect(isSafeHref("/\\/evil.com")).toBe(false);
+    expect(isSafeHref("/app/jobs/123")).toBe(true);
+    expect(isSafeHref("javascript:alert(1)")).toBe(false);
+    expect(isSafeHref("data:text/html,x")).toBe(false);
+  });
+
   it("leaves an unclosed bold marker as plain text while streaming", () => {
     expect(parseInline("hello **wor")).toEqual([{ t: "text", v: "hello **wor" }]);
   });

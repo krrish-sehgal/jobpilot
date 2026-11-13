@@ -63,11 +63,11 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
             <p className="px-3 text-sm text-muted">No conversations yet. Say hello!</p>
           ) : (
             conversations.map((c) => {
-              const active = pathname === `/app/chat/${c.id}`;
+              const active = pathname === `/app/chat/${encodeURIComponent(c.id)}`;
               return (
                 <Link
                   key={c.id}
-                  href={`/app/chat/${c.id}`}
+                  href={`/app/chat/${encodeURIComponent(c.id)}`}
                   aria-current={active ? "page" : undefined}
                   title={c.title}
                   className={cn("block truncate rounded-lg px-3 py-2 text-sm", active ? "bg-sunken font-medium" : "text-ink/80 hover:bg-sunken")}

@@ -15,7 +15,7 @@ export function JobCard({ job, className, onSaveChange }: { job: JobCardData; cl
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <h3 className="font-display text-lg leading-snug">
-            <Link href={`/app/jobs/${job.job_id}`} className="hover:text-brand hover:underline">{job.title}</Link>
+            <Link href={`/app/jobs/${encodeURIComponent(job.job_id)}`} className="hover:text-brand hover:underline">{job.title}</Link>
           </h3>
           <p className="text-sm text-muted">{job.company}</p>
         </div>
@@ -36,8 +36,8 @@ export function JobCard({ job, className, onSaveChange }: { job: JobCardData; cl
 
       <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
         <SaveButton jobId={job.job_id} initialSaved={job.is_saved} onChange={onSaveChange} />
-        <Link href={`/app/jobs/${job.job_id}`} className={buttonClasses("secondary", "sm")}>Details</Link>
-        <Link href={`/app/tailor/new?jobId=${job.job_id}`} className={buttonClasses("ghost", "sm", "text-brand")}>
+        <Link href={`/app/jobs/${encodeURIComponent(job.job_id)}`} className={buttonClasses("secondary", "sm")}>Details</Link>
+        <Link href={`/app/tailor/new?jobId=${encodeURIComponent(job.job_id)}`} className={buttonClasses("ghost", "sm", "text-brand")}>
           <Wand2 className="h-3.5 w-3.5" aria-hidden /> Tailor my resume
         </Link>
       </div>
