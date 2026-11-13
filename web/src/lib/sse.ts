@@ -28,10 +28,17 @@ export class SseParser {
   feed(chunk: string): SseMessage[] {
     this.buffer += chunk;
     const out: SseMessage[] = [];
+    // A chunk ending in "\r" may be the first half of "\r\n". Hold it back until the next chunk
+    // says which it was, otherwise the "\n" would be read as a second, blank line and end the message early.
+    let held = "";
+    if (this.buffer.endsWith("\r")) {
+      held = "\r";
+      this.buffer = this.buffer.slice(0, -1);
+    }
     // Lines may end in \n, \r\n or a lone \r.
     const lines = this.buffer.split(/\r\n|\n|\r/);
     // The last element is an incomplete line (possibly ""), keep it for the next chunk.
-    this.buffer = lines.pop() ?? "";
+    this.buffer = (lines.pop() ?? "") + held;
     for (const line of lines) this.consumeLine(line, out);
     return out;
   }
@@ -39,8 +46,10 @@ export class SseParser {
   /** Call when the stream ends; emits a final message if the server omitted the trailing blank line. */
   flush(): SseMessage[] {
     const out: SseMessage[] = [];
-    if (this.buffer) {
-      this.consumeLine(this.buffer, out);
+    // A held-back trailing "\r" was a line terminator, not part of the text.
+    const rest = this.buffer.replace(/\r$/, "");
+    if (rest) {
+      this.consumeLine(rest, out);
       this.buffer = "";
     }
     this.consumeLine("", out);

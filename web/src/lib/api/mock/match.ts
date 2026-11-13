@@ -59,12 +59,14 @@ export function rankJobs(q: ParsedQuery, limit = 6): JobCard[] {
   });
   const filtered = scored.filter((j) => (!q.tier || j.location_tier === q.tier) && (!q.level || j.seniority_band === q.level) && (!q.category || j.role_category === q.category));
   const pool = filtered.length >= 2 ? filtered : scored;
-  return pool.sort((a, b) => b.match_score - a.match_score).slice(0, limit).map(toCard);
+  return pool.sort((a, b) => b.match_score - a.match_score).slice(0, limit).map(toJobCard);
 }
 
 /** Cards in chat omit the long description; strip the detail-only fields so payloads match the contract. */
-function toCard(j: JobCard & { description?: string; employment_type?: string; min_years_experience?: number }): JobCard {
-  const { description: _d, employment_type: _e, min_years_experience: _m, ...card } = j;
-  void _d; void _e; void _m;
+function toJobCard(job: JobCard & { description?: string; employment_type?: string; min_years_experience?: number }): JobCard {
+  const { description, employment_type, min_years_experience, ...card } = job;
+  void description;
+  void employment_type;
+  void min_years_experience;
   return card;
 }

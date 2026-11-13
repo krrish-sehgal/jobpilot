@@ -16,6 +16,14 @@ const PARSE_MS = 2600;
 
 const notFound = (what: string) => new ApiError("not_found", `${what} not found`, 404);
 
+/** Drops the detail-only fields so a list entry matches the ResumeSummary contract. */
+function toResumeSummary(resume: Resume): ResumeSummary {
+  const { failure_reason, sections, ...summary } = resume;
+  void failure_reason;
+  void sections;
+  return summary;
+}
+
 /** Implements the same ApiClient as the HTTP client, entirely in memory. See web/README.md. */
 export class MockApiClient implements ApiClient {
   // ---------- auth ----------
@@ -115,7 +123,7 @@ export class MockApiClient implements ApiClient {
   }
   async listResumes(): Promise<ResumeSummary[]> {
     await sleep(LATENCY);
-    return [...db.resumes.keys()].map((id) => this.resolve(id)).map(({ failure_reason: _f, sections: _s, ...s }) => (void _f, void _s, s)).sort((a, b) => b.uploaded_at.localeCompare(a.uploaded_at));
+    return [...db.resumes.keys()].map((id) => toResumeSummary(this.resolve(id))).sort((a, b) => b.uploaded_at.localeCompare(a.uploaded_at));
   }
   async getResume(id: string): Promise<Resume> {
     await sleep(150);

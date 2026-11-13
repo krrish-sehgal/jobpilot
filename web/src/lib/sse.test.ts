@@ -23,6 +23,19 @@ describe("SseParser", () => {
     expect(out).toEqual([{ event: "x", data: "a\nb" }]);
   });
 
+  it("handles a CRLF split across chunks without ending the message early", () => {
+    const p = new SseParser();
+    expect(p.feed("event: x\r\ndata: a\r")).toEqual([]);
+    expect(p.feed("\ndata: b\r\n\r")).toEqual([]);
+    expect(p.feed("\n")).toEqual([{ event: "x", data: "a\nb" }]);
+  });
+
+  it("does not leak a held-back \\r into the final flushed line", () => {
+    const p = new SseParser();
+    expect(p.feed("data: tail\r")).toEqual([]);
+    expect(p.flush()).toEqual([{ event: "message", data: "tail" }]);
+  });
+
   it("defaults the event name and flushes a trailing message", () => {
     const p = new SseParser();
     expect(p.feed("data: tail")).toEqual([]);
