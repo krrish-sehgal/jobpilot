@@ -36,7 +36,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         aria-label="Sidebar"
         className={`fixed inset-y-0 left-0 z-50 w-72 border-r border-line bg-surface transition-transform lg:hidden ${drawer ? "translate-x-0" : "-translate-x-full"}`}
         // Hidden drawers must not be tabbable.
-        {...(drawer ? {} : { inert: true } as object)}
+        {...(drawer ? {} : ({ inert: "" } as object))}
       >
         <Sidebar onClose={() => setDrawer(false)} />
       </aside>

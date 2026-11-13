@@ -33,7 +33,7 @@ export function Features() {
         <div>
           <p className="font-mono text-xs uppercase tracking-widest text-signal">Show your work</p>
           <h2 className="mt-3 font-display text-4xl">An agent you can watch think</h2>
-          <p className="mt-4 text-muted">Every reply streams live. You see which tools the agent is calling ("Searching remote backend roles", "Found 6 matching roles") before the answer arrives, so nothing is a black box.</p>
+          <p className="mt-4 text-muted">Every reply streams live. You see which tools the agent is calling (&ldquo;Searching remote backend roles&rdquo;, &ldquo;Found 6 matching roles&rdquo;) before the answer arrives, so nothing is a black box.</p>
         </div>
         <ul className="space-y-3 rounded-2xl border border-line bg-surface p-6 font-mono text-sm">
           <li className="text-good">&#10003; Recalled 2 preferences</li>
