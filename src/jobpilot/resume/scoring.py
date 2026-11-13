@@ -195,7 +195,7 @@ def score_match(
     """Score `sections` against the job described by `entries`.
 
     Only each entry's term and importance are used; coverage is measured
-    on `sections` itself. To score a hypothetical "after" resume, pass
+    on `sections` itself. To score a projected "after" resume, pass
     the sections with suggestions applied.
     """
 
