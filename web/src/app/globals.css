@@ -1,0 +1,91 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  Design tokens. Light is "paper and ink" (warm off-white, deep green ink);
+  dark is "night cockpit". Values are space-separated RGB for Tailwind alpha.
+  Dark mode follows the OS unless the user picked a theme explicitly, which we
+  record as data-theme on <html> (see ThemeProvider). Doing it in CSS means no
+  blocking inline script and no flash for the common case.
+*/
+:root {
+  --paper: 247 243 234;
+  --surface: 255 253 248;
+  --sunken: 238 233 221;
+  --ink: 22 33 29;
+  --muted: 98 110 104;
+  --line: 217 210 195;
+  --brand: 14 90 75;
+  --brand-ink: 255 253 248;
+  --signal: 224 112 40;
+  --good: 22 128 80;
+  --bad: 190 52 52;
+  --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: 14 20 18;
+    --surface: 22 31 28;
+    --sunken: 10 15 13;
+    --ink: 236 232 220;
+    --muted: 150 162 155;
+    --line: 45 58 53;
+    --brand: 92 200 168;
+    --brand-ink: 10 18 15;
+    --signal: 242 150 80;
+    --good: 90 200 140;
+    --bad: 240 110 110;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: 14 20 18;
+  --surface: 22 31 28;
+  --sunken: 10 15 13;
+  --ink: 236 232 220;
+  --muted: 150 162 155;
+  --line: 45 58 53;
+  --brand: 92 200 168;
+  --brand-ink: 10 18 15;
+  --signal: 242 150 80;
+  --good: 90 200 140;
+  --bad: 240 110 110;
+  color-scheme: dark;
+}
+
+@layer base {
+  html { -webkit-text-size-adjust: 100%; }
+  body { @apply bg-paper font-sans text-ink antialiased; }
+  :focus-visible { @apply outline-none ring-2 ring-brand ring-offset-2 ring-offset-paper; }
+  ::selection { background: rgb(var(--signal) / 0.3); }
+}
+
+@layer components {
+  .grid-paper {
+    background-image:
+      linear-gradient(rgb(var(--line) / 0.55) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--line) / 0.55) 1px, transparent 1px);
+    background-size: 36px 36px;
+    mask-image: radial-gradient(ellipse at 50% 30%, black 20%, transparent 75%);
+  }
+  .scroll-thin { scrollbar-width: thin; scrollbar-color: rgb(var(--line)) transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* ThemeToggle shows the icon for the theme you'd switch to. */
+.dark-show { display: none; }
+:root[data-theme="dark"] .dark-show { display: block; }
+:root[data-theme="dark"] .dark-hide { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .dark-show { display: block; }
+  :root:not([data-theme="light"]) .dark-hide { display: none; }
+}
