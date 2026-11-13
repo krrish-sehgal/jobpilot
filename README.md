@@ -29,6 +29,32 @@ jobpilot/
 
 The website (chat + resume tailoring, with a no-backend mock mode) lives in [`web/`](web/README.md); its API contract is [`docs/web-api.md`](docs/web-api.md).
 
+## Where to look
+
+Two features, each traced from the screen to the backend:
+
+**Job-hunting chat**
+
+| Step | Website (`web/src/`) | Backend (`src/jobpilot/`) |
+|---|---|---|
+| Chat screen, composer, messages | `components/chat/ChatView.tsx`, `Composer.tsx`, `MessageList.tsx` | — |
+| Send a message (idempotent) | `lib/api/http.ts` → `POST /conversations/{id}/messages` | `web/routes_chat.py` |
+| Stream the reply live | `hooks/useChatStream.ts`, `lib/sse.ts` | `web/streaming.py` |
+| Agent picks tools | `components/chat/ToolActivity.tsx` (shows each step) | `agent/loop.py`, `agent/tools.py`, `agent/events.py` |
+| Job results | `components/jobs/JobCard.tsx` | `search/hybrid.py`, `search/ranking.py`, `chat/cards.py` |
+
+**Resume review and tailoring**
+
+| Step | Website (`web/src/`) | Backend (`src/jobpilot/`) |
+|---|---|---|
+| Upload + parsed view | `components/resume/UploadDropzone.tsx`, `ResumeSections.tsx` | `resume/extract.py`, `resume/parser.py` |
+| Start tailoring for a job | `components/tailor/TailorNewForm.tsx` | `web/routes_tailorings.py`, `resume/service.py` |
+| Keywords + match score | `components/tailor/KeywordCoverage.tsx`, `ScoreMeter.tsx` | `resume/keywords.py`, `resume/scoring.py` |
+| Suggestions + no-fabrication check | `components/tailor/SuggestionCard.tsx`, `DiffText.tsx`, `lib/diff.ts` | `resume/tailor.py`, `resume/guard.py` |
+| Accept / reject, preview, export | `hooks/useTailoring.ts`, `ExportButtons.tsx`, `lib/resumeApply.ts` | `resume/apply.py`, `resume/render.py` |
+
+Try it with no backend: `cd web && npm install && npm run dev` (mock mode is the default; any email and any 6-digit code except `000000` signs you in).
+
 ## The core ideas
 
 1. **Agentic loop, not a single generation.** The agent has five
