@@ -18,7 +18,7 @@ import type {
 /**
  * The one interface the UI programs against. There are two implementations:
  *  - HttpApiClient (./http.ts)  talks to the real backend (docs/web-api.md)
- *  - MockApiClient (./mock/)    seeded in-memory data, no network at all
+ *  - MockApiClient (./mock/)    in-memory data for offline mode, no network at all
  * Components import `api` from "@/lib/api" and never learn which one they got.
  */
 export interface ApiClient {

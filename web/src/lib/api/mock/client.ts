@@ -33,14 +33,14 @@ export class MockApiClient implements ApiClient {
   }
   async verifyCode(email: string, code: string): Promise<AuthSession> {
     await sleep(LATENCY);
-    // Any 6-digit code works except 000000, so the error state can be demoed.
+    // Any 6-digit code works except 000000, so the error state can be exercised.
     if (!/^\d{6}$/.test(code) || code === "000000") throw new ApiError("validation_failed", "That code is incorrect or expired.", 422);
     db.user.email = email;
     return { access_token: `mock-${newId()}`, expires_at: new Date(Date.now() + 8 * 3600_000).toISOString(), user: { ...db.user } };
   }
   async me(): Promise<User> {
     await sleep(80);
-    return { ...db.user, email: db.user.email || "demo@example.com" };
+    return { ...db.user, email: db.user.email || "you@example.com" };
   }
 
   // ---------- chat ----------
@@ -103,7 +103,7 @@ export class MockApiClient implements ApiClient {
       onProgress(i / 5);
     }
     const id = newId();
-    const failing = /fail/i.test(file.name); // demo hook: name a file "fail.pdf" to see the failed state
+    const failing = /fail/i.test(file.name); // dev hook: name a file "fail.pdf" to see the failed state
     const hadPrimary = [...db.resumes.values()].some((r) => r.summary.is_primary);
     db.resumes.set(id, {
       summary: { id, file_name: file.name, status: "parsing", is_primary: !hadPrimary, uploaded_at: nowIso() },

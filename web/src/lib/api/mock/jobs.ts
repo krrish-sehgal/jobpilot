@@ -1,7 +1,7 @@
 import type { EmploymentType, JobDetail, LocationTier, RoleCategory, SeniorityBand } from "../types";
 
 /*
-  Seed data for mock mode. Every company and posting here is invented.
+  Seed data for offline mode.
   Each seed carries the few fields that differ; `toDetail` fills in the
   contract-shaped record (description text, apply URL, preview, ...).
 */

@@ -1,6 +1,6 @@
 import type { ResumeSections } from "../types";
 
-/** The parsed resume every mock upload resolves to. Invented person, invented employers. */
+/** The parsed resume every mock upload resolves to. Fixed sample content for offline mode. */
 export const SAMPLE_SECTIONS: ResumeSections = {
   contact: {
     name: "Riya Calloway",

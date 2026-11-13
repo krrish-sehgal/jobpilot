@@ -37,7 +37,7 @@ export function Features() {
         </div>
         <ul className="space-y-3 rounded-2xl border border-line bg-surface p-6 font-mono text-sm">
           <li className="text-good">&#10003; Recalled 2 preferences</li>
-          <li className="text-good">&#10003; Read Riya_Calloway_Resume.pdf</li>
+          <li className="text-good">&#10003; Read your resume</li>
           <li className="text-good">&#10003; Found 6 matching roles</li>
           <li className="text-muted">&#8230; writing reply<span className="animate-blink">_</span></li>
         </ul>

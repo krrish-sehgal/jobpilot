@@ -22,7 +22,7 @@ export interface MockResume {
 /** Everything the mock backend "stores". A plain module singleton: it survives client-side navigation and resets on reload. */
 export const db = {
   user: {
-    id: "user-demo",
+    id: "user-local",
     email: "",
     full_name: "Riya Calloway",
     seniority_band: "mid",
@@ -35,8 +35,8 @@ export const db = {
   resumes: new Map<string, MockResume>(),
   tailorings: new Map<string, TailoringRecord>(),
   turns: new Map<string, MockTurn>(),
-  /** "/fail" demo: conversation+message pairs whose first attempt already errored, so the retry (a fresh client_message_id) succeeds. */
-  failedDemo: new Set<string>(),
+  /** "/fail" dev hook: conversation+message pairs whose first attempt already errored, so the retry (a fresh client_message_id) succeeds. */
+  failedOnce: new Set<string>(),
   /** client_message_id -> original ids, which is what makes sendMessage idempotent. */
   sent: new Map<string, SentMessage>(),
 };

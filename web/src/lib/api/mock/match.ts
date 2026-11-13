@@ -3,9 +3,9 @@ import { withSaved, primaryResume } from "./db";
 import { JOBS } from "./jobs";
 
 /*
-  A tiny stand-in for the real hybrid search + ranking engine: keyword hits
-  against a few fields, plus overlap with the primary resume's skills. Good
-  enough to make the demo respond to what you type.
+  A small keyword matcher for offline mode: keyword hits against a few fields,
+  plus overlap with the primary resume's skills. The live backend uses hybrid
+  semantic search and ranking instead.
 */
 
 const TIER_WORDS: Record<string, LocationTier> = { remote: "remote", hybrid: "hybrid", onsite: "onsite", "on-site": "onsite" };

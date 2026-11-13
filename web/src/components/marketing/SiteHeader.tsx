@@ -19,7 +19,7 @@ export function SiteHeader() {
 export function SiteFooter() {
   return (
     <footer className="border-t border-line px-6 py-8 text-center text-sm text-muted">
-      JobPilot is a demo project. All companies and postings shown in demo mode are fictional.
+      &copy; {new Date().getFullYear()} JobPilot
     </footer>
   );
 }

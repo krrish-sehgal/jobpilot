@@ -98,7 +98,7 @@ export function LoginForm() {
 
       {isMockMode ? (
         <p className="mt-6 rounded-lg bg-signal/10 p-3 text-xs text-ink">
-          <strong>Demo mode.</strong> No email is sent. Enter any address, then any 6-digit code (except 000000).
+          <strong>Local development:</strong> no email is sent. Enter any 6-digit code.
         </p>
       ) : null}
     </Card>

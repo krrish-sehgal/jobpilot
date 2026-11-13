@@ -9,7 +9,7 @@ import { newId, nowIso, sleep } from "./util";
   A scripted agent turn. It emits the same event sequence the real backend
   does (status -> tool_call -> tool_result -> token... -> job_cards -> done),
   with small delays so the streaming UI is visible. There is no model here:
-  intent is picked with a few regexes, which is enough to demo every UI state.
+  intent is picked with a few regexes, which is enough to exercise every UI state offline.
 */
 
 const ORDINALS: Record<string, number> = { first: 0, "1st": 0, second: 1, "2nd": 1, third: 2, "3rd": 2, last: -1 };
@@ -38,10 +38,10 @@ export async function* runTurn(turn: MockTurn, signal: AbortSignal): AsyncGenera
   yield { event: "status", data: { phase: "thinking" } };
   await sleep(550, signal);
 
-  // Demo hook: "/fail" errors the first stream so the retry UI can be seen.
+  // Dev hook: "/fail" errors the first stream so the retry UI can be seen.
   const failKey = `${turn.conversationId}:${text}`;
-  if (/\/fail\b/i.test(text) && !db.failedDemo.has(failKey)) {
-    db.failedDemo.add(failKey);
+  if (/\/fail\b/i.test(text) && !db.failedOnce.has(failKey)) {
+    db.failedOnce.add(failKey);
     yield { event: "error", data: { code: "internal", message: "The agent timed out while searching. Nothing was lost.", retryable: true } };
     return;
   }

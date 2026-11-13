@@ -7,33 +7,33 @@ no state library, only React hooks and context.
 
 ```
 npm install
-cp .env.example .env.local     # defaults to mock mode
+cp .env.example .env.local     # defaults to offline mode
 npm run dev                    # http://localhost:3000
 npm run typecheck && npm run lint && npm run build && npm test
 ```
 
-## Mock mode vs live mode
+## Offline mode vs live mode
 
 | `NEXT_PUBLIC_API_MODE` | Behaviour |
 |---|---|
-| `mock` (default) | Everything runs in the browser against seeded data. No backend needed. |
+| `mock` (default) | Offline mode for local frontend development and tests. Everything runs in the browser against local data; no backend needed. |
 | `live` | Talks to the real web API. Also set `NEXT_PUBLIC_API_BASE_URL` (the client appends `/api/v1`). |
 
 Both modes implement one interface, `ApiClient` (`src/lib/api/client.ts`). `src/lib/api/index.ts`
 is the only file that picks an implementation; components just `import { api } from "@/lib/api"`.
 
-Mock mode (`src/lib/api/mock/`) is realistic enough to demo every state:
+Offline mode (`src/lib/api/mock/`) is an in-browser implementation of the same API, so every UI state can be exercised without a backend:
 
-- 12 invented jobs at invented companies (`jobs.ts`) and a sample parsed resume (`resumeSample.ts`).
+- Seed data: 12 job postings (`jobs.ts`) and one parsed resume (`resumeSample.ts`).
 - A scripted agent turn (`agent.ts`) emits `status` -> `tool_call` -> `tool_result` -> `token`... -> `job_cards` -> `done`
   with small delays. There is no model: a few regexes pick "search", "tailor" or "help", and `match.ts`
   ranks the seed jobs against your words and the resume's skills.
 - Ask "tailor my resume for the first one" and the agent emits `tailoring_started`.
 - Tailoring (`tailoring.ts`) is `running` for ~2.8 s, then `ready` with ~6 suggestions.
-- Demo hooks: sign in with any email and any 6-digit code except `000000`; type `/fail` in a chat message to see the
+- Dev hooks: sign in with any email and any 6-digit code except `000000`; type `/fail` in a chat message to see the
   retryable error state (the retry, sent with a fresh `client_message_id`, succeeds); upload a file whose name contains `fail` to see a failed parse.
 - State is a module singleton (`db.ts`): it survives navigation and resets on reload.
-- Mock "Export DOCX" produces RTF (a real .docx needs zipping), so the button reads "Export Word (RTF)" in mock mode; PDF export is a small hand-built valid PDF.
+- Offline "Export DOCX" produces RTF, so the button reads "Export Word (RTF)" in this mode; PDF export is a small hand-built valid PDF. The live backend renders real DOCX and PDF files.
 
 ## Layout
 
@@ -109,7 +109,7 @@ which flips auth to anonymous, and `RequireAuth` (used by `app/app/layout.tsx`) 
 ## Contract notes and ambiguities
 
 - **`score_after`** is not defined precisely. The UI treats it as the server's projection with all non-rejected
-  suggestions applied, and always takes it from the latest server response. The mock computes it that way.
+  suggestions applied, and always takes it from the latest server response. Offline mode computes it that way.
 - **`reorder_section`**: `section` is `skills` or `projects`; `proposed` lists that section's items comma-separated,
   most relevant first (see "Suggestion semantics" in `docs/web-api.md`). Matching is case-insensitive and items the
   list doesn't mention keep their relative order at the end. Sections themselves are never reordered.
@@ -128,4 +128,4 @@ diffs never rely on color alone (strikethrough / underline); `prefers-reduced-mo
 ## Tests
 
 `npm test` (vitest) covers the SSE parser, the markdown renderer's parsing and link safety, the word diff, the stream
-reducer, and the mock client's event ordering, idempotency and tailoring lifecycle.
+reducer, and the offline client's event ordering, idempotency and tailoring lifecycle.

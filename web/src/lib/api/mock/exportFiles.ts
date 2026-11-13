@@ -2,7 +2,7 @@
 
 const esc = (s: string) => s.replace(/[\\()]/g, "\\$&").replace(/[^\x20-\x7e]/g, "?");
 
-/** A one-page, Helvetica, text-only PDF. Enough for a demo; the real backend renders properly. */
+/** A one-page, Helvetica, text-only PDF. Enough for offline mode; the live backend renders full documents. */
 export function buildPdf(lines: string[]): Blob {
   const body = ["BT", "/F1 10 Tf", "14 TL", "50 790 Td", ...lines.slice(0, 52).map((l) => `(${esc(l.slice(0, 95))}) Tj T*`), "ET"].join("\n");
   const objs = [
