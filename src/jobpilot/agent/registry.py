@@ -20,15 +20,18 @@ from jobpilot.agent.tools import (
     GET_JOB_DETAILS_SCHEMA,
     RECALL_MEMORY_SCHEMA,
     SEARCH_JOBS_SCHEMA,
+    TAILOR_RESUME_SCHEMA,
     AgentToolContext,
     FetchResumeArgs,
     GetJobDetailsArgs,
     RecallMemoryArgs,
     SearchJobsArgs,
+    TailorResumeArgs,
     fetch_resume,
     get_job_details,
     recall_memory,
     search_jobs,
+    tailor_resume,
 )
 from jobpilot.errors import ToolArgumentError, UnknownToolError
 
@@ -76,5 +79,8 @@ def build_default_registry() -> ToolRegistry:
     registry.register(ToolSpec("fetch_resume", FETCH_RESUME_SCHEMA, FetchResumeArgs, fetch_resume))
     registry.register(
         ToolSpec("get_job_details", GET_JOB_DETAILS_SCHEMA, GetJobDetailsArgs, get_job_details)
+    )
+    registry.register(
+        ToolSpec("tailor_resume", TAILOR_RESUME_SCHEMA, TailorResumeArgs, tailor_resume)
     )
     return registry

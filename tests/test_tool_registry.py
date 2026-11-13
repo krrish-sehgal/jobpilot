@@ -31,13 +31,14 @@ def build_context(user_id=None) -> AgentToolContext:
     ), jobs
 
 
-def test_registry_exposes_all_four_tool_schemas():
+def test_registry_exposes_all_five_tool_schemas():
     registry = build_default_registry()
     assert set(registry.names()) == {
         "search_jobs",
         "recall_memory",
         "fetch_resume",
         "get_job_details",
+        "tailor_resume",
     }
     for schema in registry.schemas():
         assert "name" in schema and "input_schema" in schema

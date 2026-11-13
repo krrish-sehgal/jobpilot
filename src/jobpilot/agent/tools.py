@@ -1,20 +1,22 @@
-"""The four tools the agent can call, plus their JSON-schema definitions.
+"""The five tools the agent can call, plus their JSON-schema definitions.
 
 Each tool has: a Pydantic model for its arguments (used to validate
 what the model produced before we ever call real code with it), a
 handler function, and a JSON-schema dict in the shape most LLM tool-use
 APIs expect. `jobpilot.agent.registry.build_default_registry` wires all
-four into a `ToolRegistry`.
+five into a `ToolRegistry`.
 """
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Any, Protocol
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from jobpilot.chat.cards import render_job_card
 from jobpilot.db.repositories.jobs import JobRepository
 from jobpilot.errors import RecordNotFoundError
 from jobpilot.integrations.llm import LLMClient
@@ -43,6 +45,31 @@ class StaticResumeFetcher(ResumeFetcher):
         return self.resumes_by_user_id.get(str(user_id))
 
 
+class TailoringLauncher(Protocol):
+    """Starts a resume tailoring on the user's behalf.
+
+    Implemented by `jobpilot.resume.service.ResumeService`. Declared here
+    as a protocol so the agent layer does not import the resume package.
+    Returns a plain dict (`started`, plus either `tailoring_id`/`job_title`
+    or a `reason`) because the agent reads the outcome as text.
+    """
+
+    def start_from_chat(self, user_id: UUID, job_id: str) -> dict[str, Any]: ...
+
+
+@dataclass
+class TurnArtifacts:
+    """Structured by-products of a turn, kept out of the model's context.
+
+    The model only sees each tool's return value as text. UI-ready things
+    (full job cards, a started tailoring) are collected here as tools run,
+    so the caller can show them without the model having to echo them.
+    """
+
+    job_cards: list[dict[str, Any]] = field(default_factory=list)
+    tailorings: list[dict[str, Any]] = field(default_factory=list)
+
+
 @dataclass
 class AgentToolContext:
     """Dependencies the tool handlers need, bundled for the agent loop."""
@@ -55,6 +82,9 @@ class AgentToolContext:
     resume_fetcher: ResumeFetcher
     candidate_seniority: SeniorityBand | None = None
     preferred_location_tiers: list[LocationTier] | None = None
+    saved_job_ids: set[str] = field(default_factory=set)
+    tailoring_launcher: TailoringLauncher | None = None
+    artifacts: TurnArtifacts = field(default_factory=TurnArtifacts)
 
 
 # --- search_jobs -----------------------------------------------------
@@ -98,6 +128,17 @@ def search_jobs(ctx: AgentToolContext, args: SearchJobsArgs) -> list[dict]:
         candidate_seniority=ctx.candidate_seniority,
         limit=args.limit,
     )
+    known = {card["job_id"] for card in ctx.artifacts.job_cards}
+    for scored in results:
+        card = render_job_card(
+            scored,
+            candidate_seniority=ctx.candidate_seniority,
+            preferred_location_tiers=ctx.preferred_location_tiers,
+            saved_job_ids=ctx.saved_job_ids,
+        )
+        if card["job_id"] not in known:
+            ctx.artifacts.job_cards.append(dict(card))
+            known.add(card["job_id"])
     return [
         {
             "job_id": str(scored.job.id),
@@ -198,3 +239,39 @@ def get_job_details(ctx: AgentToolContext, args: GetJobDetailsArgs) -> dict:
         "employment_type": job.employment_type.value,
         "compensation": job.compensation.model_dump() if job.compensation else None,
     }
+
+
+# --- tailor_resume -----------------------------------------------------
+
+
+class TailorResumeArgs(BaseModel):
+    job_id: str = Field(min_length=1, description="The job_id of the role to tailor for.")
+
+
+TAILOR_RESUME_SCHEMA = {
+    "name": "tailor_resume",
+    "description": (
+        "Start tailoring the user's primary resume for one specific job. Returns "
+        "immediately; suggestions are generated in the background and the user "
+        "reviews them in the app. Only call when the user asks to improve or adapt "
+        "their resume for a job. Requires a resume on file."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {"job_id": {"type": "string"}},
+        "required": ["job_id"],
+    },
+}
+
+
+def tailor_resume(ctx: AgentToolContext, args: TailorResumeArgs) -> dict:
+    if ctx.tailoring_launcher is None:
+        return {"started": False, "reason": "unavailable"}
+    # The model sometimes repeats a call; one tailoring per job per turn.
+    for earlier in ctx.artifacts.tailorings:
+        if earlier.get("job_id") == args.job_id:
+            return earlier
+    result = ctx.tailoring_launcher.start_from_chat(ctx.user_id, args.job_id)
+    if result.get("started"):
+        ctx.artifacts.tailorings.append(result)
+    return result

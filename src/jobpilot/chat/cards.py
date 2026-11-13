@@ -7,9 +7,18 @@ focused on reasoning rather than formatting.
 
 from __future__ import annotations
 
-from jobpilot.models import ScoredJob
+from collections.abc import Collection
+
+from jobpilot.models import LocationTier, ScoredJob, SeniorityBand
 
 _DESCRIPTION_PREVIEW_CHARS = 220
+
+
+_TIER_LABELS = {
+    LocationTier.REMOTE: "Remote",
+    LocationTier.HYBRID: "Hybrid",
+    LocationTier.ONSITE: "On-site",
+}
 
 
 class JobCard(dict):
@@ -17,7 +26,47 @@ class JobCard(dict):
     documented here for readability."""
 
 
-def render_job_card(scored: ScoredJob) -> JobCard:
+def match_reasons(
+    scored: ScoredJob,
+    *,
+    candidate_seniority: SeniorityBand | None = None,
+    preferred_location_tiers: list[LocationTier] | None = None,
+    max_reasons: int = 3,
+) -> list[str]:
+    """Plain-language reasons a job ranked well, derived from its signals.
+
+    These are read straight off the ranking signals already computed for
+    the job (`ScoredJob`), never invented by the model, so a reason is
+    only shown when the number behind it supports it. A signal that is
+    only neutral (no stated preference, unknown level) produces nothing.
+    """
+
+    job = scored.job
+    reasons: list[str] = []
+    if scored.semantic_similarity >= 0.75:
+        reasons.append("Strong skills overlap")
+    elif scored.semantic_similarity >= 0.6:
+        reasons.append("Good skills overlap")
+    if scored.location_fit_score == 1.0 and preferred_location_tiers:
+        label = _TIER_LABELS.get(job.location_tier)
+        if label:
+            reasons.append(f"{label}, matches your preference")
+    if candidate_seniority is not None and scored.seniority_fit_score == 1.0:
+        reasons.append(f"Matches your {job.seniority_band.value} level")
+    if scored.recency_score >= 0.8:
+        reasons.append("Posted recently")
+    if job.compensation is not None:
+        reasons.append("Compensation listed")
+    return (reasons or ["Relevant to your search"])[:max_reasons]
+
+
+def render_job_card(
+    scored: ScoredJob,
+    *,
+    candidate_seniority: SeniorityBand | None = None,
+    preferred_location_tiers: list[LocationTier] | None = None,
+    saved_job_ids: Collection[str] = (),
+) -> JobCard:
     job = scored.job
     description_preview = job.description[:_DESCRIPTION_PREVIEW_CHARS].rstrip()
     if len(job.description) > _DESCRIPTION_PREVIEW_CHARS:
@@ -47,8 +96,16 @@ def render_job_card(scored: ScoredJob) -> JobCard:
         compensation_text=compensation_text,
         apply_url=job.apply_url,
         match_score=round(scored.combined_score, 2),
+        location_tier=job.location_tier.value,
+        match_reasons=match_reasons(
+            scored,
+            candidate_seniority=candidate_seniority,
+            preferred_location_tiers=preferred_location_tiers,
+        ),
+        posted_at=job.posted_at.isoformat() if job.posted_at else None,
+        is_saved=str(job.id) in saved_job_ids,
     )
 
 
-def render_job_cards(scored_jobs: list[ScoredJob]) -> list[JobCard]:
-    return [render_job_card(scored) for scored in scored_jobs]
+def render_job_cards(scored_jobs: list[ScoredJob], **kwargs) -> list[JobCard]:
+    return [render_job_card(scored, **kwargs) for scored in scored_jobs]
