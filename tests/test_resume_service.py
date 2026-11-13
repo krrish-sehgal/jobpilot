@@ -22,6 +22,7 @@ from jobpilot.resume.models import ResumeStatus, TailoringStatus
 from jobpilot.resume.render import DocumentFormat
 from jobpilot.resume.service import ResumeService, ServiceResumeFetcher, run_inline
 from tests.conftest import make_job_record
+from tests.doubles import PlainTextExtractor, PlainTextRenderer
 from tests.resume_fixtures import make_docx, make_pdf, scripted_llm
 
 SKILL = {
@@ -44,6 +45,8 @@ def make_service(llm=None, *, on_ready=None, max_bytes=1024 * 1024):
         jobs=jobs,
         storage=InMemoryObjectStorage(),
         llm=llm or scripted_llm(),
+        extractor=PlainTextExtractor(),
+        renderer=PlainTextRenderer(),
         schedule=run_inline,
         max_bytes=max_bytes,
         on_resume_ready=on_ready,

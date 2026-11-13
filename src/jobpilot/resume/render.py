@@ -5,17 +5,14 @@ here is one column, built from headings, paragraphs and lists: no
 tables, no multi-column layout, no images, no text in headers or
 footers, standard section names. Looking plain is the feature.
 
-Turning that into a PDF or DOCX file needs a layout engine, which is not
-a dependency of this repo, so export sits behind `DocumentRenderer`. A
-deployment plugs in HTML-to-PDF (WeasyPrint or headless Chromium over
-`render_html`) and python-docx; `StubDocumentRenderer` produces minimal
-files for tests and local development.
+Export sits behind the `DocumentRenderer` protocol;
+`FileDocumentRenderer` produces the PDF (WeasyPrint over `render_html`)
+and DOCX (python-docx) files.
 """
 
 from __future__ import annotations
 
 import io
-import zipfile
 from dataclasses import dataclass
 from enum import StrEnum
 from html import escape
@@ -135,54 +132,77 @@ class DocumentRenderer(Protocol):
     def render(self, sections: ResumeSections, fmt: DocumentFormat) -> RenderedDocument: ...
 
 
-class StubDocumentRenderer:
-    """Minimal renderer for tests and local development.
+_DOCX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
-    - DOCX: a genuine, minimal OOXML package (one paragraph per line)
-      that Word and LibreOffice open.
-    - PDF: NOT a laid-out PDF. It is the `%PDF-` header followed by the
-      plain text, which is what `StubTextExtractor` reads back. A real
-      renderer replaces this class; callers only see the protocol.
+
+class FileDocumentRenderer:
+    """Renders resumes to real files.
+
+    - PDF: WeasyPrint over `render_html`, so the file has a selectable
+      text layer in reading order.
+    - DOCX: python-docx, using the built-in heading and list styles.
+
+    Both libraries are imported when first used.
     """
 
     def render(self, sections: ResumeSections, fmt: DocumentFormat) -> RenderedDocument:
-        text = render_text(sections)
         if fmt is DocumentFormat.PDF:
-            return RenderedDocument(b"%PDF-1.4\n" + text.encode("utf-8"), "application/pdf", "pdf")
-        return RenderedDocument(
-            _minimal_docx(text),
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            "docx",
+            return RenderedDocument(self._pdf(sections), "application/pdf", "pdf")
+        return RenderedDocument(self._docx(sections), _DOCX_MEDIA_TYPE, "docx")
+
+    @staticmethod
+    def _pdf(sections: ResumeSections) -> bytes:
+        from weasyprint import HTML
+
+        return HTML(string=render_html(sections)).write_pdf()
+
+    @staticmethod
+    def _docx(sections: ResumeSections) -> bytes:
+        from docx import Document
+
+        doc = Document()
+        contact = sections.contact
+        doc.add_heading(contact.name or "Resume", level=0)
+        details = " | ".join(
+            x for x in [contact.email, contact.phone, contact.location, *contact.links] if x
         )
+        if details:
+            doc.add_paragraph(details)
 
+        def bullets(items: list[str]) -> None:
+            for item in items:
+                doc.add_paragraph(item, style="List Bullet")
 
-_CONTENT_TYPES = (
-    '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/'
-    'package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.'
-    'openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="'
-    'application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.'
-    'openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>'
-)
-_RELS = (
-    '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.'
-    'openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://'
-    'schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" '
-    'Target="word/document.xml"/></Relationships>'
-)
+        if sections.summary:
+            doc.add_heading("Summary", level=1)
+            doc.add_paragraph(sections.summary)
+        if sections.experience:
+            doc.add_heading("Experience", level=1)
+            for job in sections.experience:
+                doc.add_heading(f"{job.title}, {job.company}", level=2)
+                dates = _date_range(job.start, job.end, current=True)
+                if dates:
+                    doc.add_paragraph(dates)
+                bullets([b.text for b in job.bullets])
+        if sections.projects:
+            doc.add_heading("Projects", level=1)
+            for project in sections.projects:
+                tech = f" ({', '.join(project.tech)})" if project.tech else ""
+                doc.add_heading(f"{project.name}{tech}", level=2)
+                bullets([b.text for b in project.bullets])
+        if sections.education:
+            doc.add_heading("Education", level=1)
+            for edu in sections.education:
+                doc.add_heading(f"{edu.degree}, {edu.institution}", level=2)
+                detail = " | ".join(
+                    x for x in [_date_range(edu.start, edu.end), edu.score or ""] if x
+                )
+                if detail:
+                    doc.add_paragraph(detail)
+        if sections.skills:
+            doc.add_heading("Skills", level=1)
+            doc.add_paragraph(", ".join(sections.skills))
 
-
-def _minimal_docx(text: str) -> bytes:
-    paragraphs = "".join(
-        f'<w:p><w:r><w:t xml:space="preserve">{escape(line)}</w:t></w:r></w:p>'
-        for line in text.splitlines()
-    )
-    document = (
-        '<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.'
-        f'openxmlformats.org/wordprocessingml/2006/main"><w:body>{paragraphs}</w:body></w:document>'
-    )
-    buffer = io.BytesIO()
-    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr("[Content_Types].xml", _CONTENT_TYPES)
-        archive.writestr("_rels/.rels", _RELS)
-        archive.writestr("word/document.xml", document)
-    return buffer.getvalue()
+        buffer = io.BytesIO()
+        doc.save(buffer)
+        return buffer.getvalue()

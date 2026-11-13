@@ -23,6 +23,7 @@ from jobpilot.web.app import create_web_app
 from jobpilot.web.auth import RecordingCodeSender
 from jobpilot.web.deps import WebContainer, build_container
 from tests.conftest import make_job_record
+from tests.doubles import PlainTextExtractor, PlainTextRenderer
 from tests.resume_fixtures import make_pdf, sample_resume_json
 
 ORIGIN = "https://app.example.com"
@@ -103,6 +104,8 @@ def build_web(script: ChatScript | None = None, *, suggestions: list[dict] | Non
         llm=FakeLLMClient(responder=responder),
         storage=InMemoryObjectStorage(),
         code_sender=sender,
+        extractor=PlainTextExtractor(),
+        renderer=PlainTextRenderer(),
         scheduler=run_inline,
     )
     client = TestClient(create_web_app(settings, container=container))

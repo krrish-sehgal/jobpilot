@@ -78,7 +78,7 @@ SAMPLE_RESUME_TEXT = "Priya Nair\npriya@example.com\nBackend Engineer, Acme Paym
 
 
 def make_pdf(text: str = SAMPLE_RESUME_TEXT) -> bytes:
-    """A file that passes the PDF magic-byte check and the stub extractor."""
+    """A file that passes the PDF magic-byte check and `PlainTextExtractor`."""
 
     return b"%PDF-1.4\n" + text.encode("utf-8")
 

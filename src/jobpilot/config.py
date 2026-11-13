@@ -43,7 +43,10 @@ class Settings(BaseSettings):
     database_pool_max_size: int = Field(default=10, ge=1)
 
     # LLM provider
-    llm_provider: str = Field(default="fake", description="fake | openai | anthropic")
+    llm_provider: str = Field(
+        default="fake", description="fake | openai (any OpenAI-compatible endpoint)"
+    )
+    llm_base_url: str = Field(default="https://api.openai.com/v1")
     llm_api_key: str = Field(default="replace-with-llm-api-key")
     llm_chat_model: str = Field(default="gpt-4o-mini")
     llm_embedding_model: str = Field(default="text-embedding-3-small")
@@ -59,6 +62,7 @@ class Settings(BaseSettings):
     # Queue (ingestion + enrichment fan-out)
     queue_backend: str = Field(default="memory", description="memory | sqs | redis")
     queue_url: str = Field(default="https://queue.example.com/jobpilot-ingest")
+    queue_region: str = Field(default="us-east-1")
     queue_visibility_timeout_seconds: int = Field(default=60, gt=0)
     queue_max_receive_count: int = Field(default=5, ge=1)
 

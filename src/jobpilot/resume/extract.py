@@ -8,13 +8,13 @@ Two separate jobs live here and are kept apart on purpose:
    zip archive that actually contains `word/document.xml`. A renamed
    executable or a random zip fails here with a domain error.
 2. A `TextExtractor` turns validated bytes into text. That is the part
-   that needs heavyweight parsers, so it sits behind a protocol.
+   that needs document parsers, so it sits behind a protocol;
+   `DocumentTextExtractor` is the implementation.
 """
 
 from __future__ import annotations
 
 import io
-import re
 import zipfile
 from enum import StrEnum
 from typing import Protocol
@@ -71,18 +71,12 @@ class TextExtractor(Protocol):
     def extract(self, data: bytes, kind: FileKind) -> str: ...
 
 
-class StubTextExtractor:
-    """Dependency-free extractor for tests and local development.
+class DocumentTextExtractor:
+    """Reads text from PDF (pypdf) and DOCX (python-docx) files.
 
-    - DOCX: reads paragraph text straight out of `word/document.xml`
-      with the standard library. Good enough for simple documents.
-    - PDF: real PDF text extraction needs a layout-aware parser, which
-      is deliberately not a dependency of this repo. A production
-      deployment implements `TextExtractor` with pdfminer.six (PDF) and
-      python-docx (DOCX) and passes it to `ResumeService`. This stub
-      treats everything after the `%PDF-` header line as UTF-8 text,
-      which is what `StubDocumentRenderer` writes, so exported stub
-      files can be uploaded again.
+    The parsers are imported on first use so importing this module stays
+    cheap. Files the parsers cannot open, or that contain no text (a
+    scanned image, say), raise `ResumeParseError`.
     """
 
     def extract(self, data: bytes, kind: FileKind) -> str:
@@ -94,22 +88,26 @@ class StubTextExtractor:
 
     @staticmethod
     def _extract_pdf(data: bytes) -> str:
-        _header, _sep, body = data.partition(b"\n")
-        return body.decode("utf-8", errors="ignore")
+        from pypdf import PdfReader
+        from pypdf.errors import PyPdfError
+
+        try:
+            reader = PdfReader(io.BytesIO(data))
+            if reader.is_encrypted:
+                raise ResumeParseError("password-protected PDFs are not supported")
+            return "\n".join(page.extract_text() or "" for page in reader.pages)
+        except PyPdfError as exc:
+            raise ResumeParseError("could not read the PDF file") from exc
 
     @staticmethod
     def _extract_docx(data: bytes) -> str:
+        from docx import Document
+
         try:
-            with zipfile.ZipFile(io.BytesIO(data)) as archive:
-                xml = archive.read(_DOCX_REQUIRED_MEMBER).decode("utf-8", errors="ignore")
-        except (zipfile.BadZipFile, KeyError) as exc:
+            document = Document(io.BytesIO(data))
+        except Exception as exc:  # python-docx raises assorted errors for malformed packages
             raise ResumeParseError("could not read the DOCX file") from exc
-        xml = re.sub(r"</w:p>", "\n", xml)
-        text = re.sub(r"<[^>]+>", "", xml)
-        return (
-            text.replace("&amp;", "&")
-            .replace("&lt;", "<")
-            .replace("&gt;", ">")
-            .replace("&quot;", '"')
-            .replace("&apos;", "'")
-        )
+        lines = [paragraph.text for paragraph in document.paragraphs]
+        for table in document.tables:
+            lines.extend(cell.text for row in table.rows for cell in row.cells)
+        return "\n".join(lines)

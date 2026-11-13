@@ -22,11 +22,11 @@ from jobpilot.resume.models import (
 from jobpilot.resume.prompts import TAILOR_SYSTEM_PROMPT
 from jobpilot.resume.render import (
     DocumentFormat,
-    StubDocumentRenderer,
     render_html,
     render_text,
 )
 from jobpilot.resume.tailor import generate_suggestions, rescore, tailor_resume
+from tests.doubles import PlainTextRenderer
 from tests.resume_fixtures import sample_sections
 from tests.test_fabrication_guard import bullet_id
 
@@ -200,8 +200,8 @@ def test_html_is_single_column_semantic_and_escaped():
     assert "Jan 2022 – Present" in html
 
 
-def test_stub_renderer_produces_openable_docx_and_roundtrippable_pdf():
-    renderer = StubDocumentRenderer()
+def test_plain_text_renderer_produces_openable_docx_and_roundtrippable_pdf():
+    renderer = PlainTextRenderer()
     sections = sample_sections()
     docx = renderer.render(sections, DocumentFormat.DOCX)
     with zipfile.ZipFile(BytesIO(docx.content)) as archive:
@@ -214,4 +214,4 @@ def test_stub_renderer_produces_openable_docx_and_roundtrippable_pdf():
 
 @pytest.mark.parametrize("fmt", list(DocumentFormat))
 def test_renderer_reports_extension(fmt):
-    assert StubDocumentRenderer().render(sample_sections(), fmt).extension == fmt.value
+    assert PlainTextRenderer().render(sample_sections(), fmt).extension == fmt.value

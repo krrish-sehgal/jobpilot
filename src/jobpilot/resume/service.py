@@ -39,7 +39,7 @@ from jobpilot.logging import get_logger
 from jobpilot.resume.apply import apply_decisions
 from jobpilot.resume.extract import (
     DEFAULT_MAX_BYTES,
-    StubTextExtractor,
+    DocumentTextExtractor,
     TextExtractor,
     detect_file_kind,
     validate_upload,
@@ -57,8 +57,8 @@ from jobpilot.resume.parser import parse_resume
 from jobpilot.resume.render import (
     DocumentFormat,
     DocumentRenderer,
+    FileDocumentRenderer,
     RenderedDocument,
-    StubDocumentRenderer,
 )
 from jobpilot.resume.tailor import rescore, tailor_resume
 
@@ -112,8 +112,8 @@ class ResumeService:
         self._jobs = jobs
         self._storage = storage
         self._llm = llm
-        self._extractor = extractor or StubTextExtractor()
-        self._renderer = renderer or StubDocumentRenderer()
+        self._extractor = extractor or DocumentTextExtractor()
+        self._renderer = renderer or FileDocumentRenderer()
         self._max_bytes = max_bytes
         self._schedule = schedule
         self._on_resume_ready = on_resume_ready

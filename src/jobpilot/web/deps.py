@@ -4,7 +4,7 @@
 database, which LLM, which storage, which repositories feed which
 services. `create_web_app` builds it once; routes receive it through
 FastAPI's dependency injection and never construct collaborators
-themselves. Tests build a container over the in-memory fakes and pass
+themselves. Tests build a container over in-memory test doubles and pass
 it in, so no route test touches real infrastructure.
 """
 
@@ -38,7 +38,7 @@ from jobpilot.db.repositories.tailorings import TailoringRepository
 from jobpilot.db.repositories.users import UserFactRepository
 from jobpilot.errors import InvalidTokenError, RecordNotFoundError
 from jobpilot.integrations.llm import FakeLLMClient, HTTPLLMClient, LLMClient
-from jobpilot.integrations.storage import HTTPObjectStorage, InMemoryObjectStorage, ObjectStorage
+from jobpilot.integrations.storage import InMemoryObjectStorage, ObjectStorage, S3ObjectStorage
 from jobpilot.integrations.supabase_client import Database, InMemoryDatabase
 from jobpilot.memory.store import MemoryStore
 from jobpilot.models import UserAccount
@@ -105,9 +105,10 @@ def build_container(
 ) -> WebContainer:
     """Assemble the service graph. Every external boundary can be overridden.
 
-    With nothing overridden and placeholder credentials in a local
-    environment, it falls back to the in-memory fakes so `make run-web`
-    starts without any infrastructure.
+    Local development uses in-memory backends when credentials are not
+    configured, so `make run-web` starts without any infrastructure.
+    Everywhere else the configured Supabase, LLM and object storage
+    backends are used.
     """
 
     if db is None:
@@ -119,7 +120,7 @@ def build_container(
         local = _is_local(settings) and settings.object_storage_access_key.startswith(
             "replace-with"
         )
-        storage = InMemoryObjectStorage() if local else HTTPObjectStorage(settings)
+        storage = InMemoryObjectStorage() if local else S3ObjectStorage(settings)
 
     users = UserAccountRepository(db)
     messages = MessageRepository(db)

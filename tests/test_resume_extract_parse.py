@@ -7,8 +7,9 @@ import pytest
 
 from jobpilot.errors import FileTooLargeError, ResumeParseError, UnsupportedFileTypeError
 from jobpilot.integrations.llm import FakeLLMClient
-from jobpilot.resume.extract import FileKind, StubTextExtractor, detect_file_kind, validate_upload
+from jobpilot.resume.extract import FileKind, detect_file_kind, validate_upload
 from jobpilot.resume.parser import assign_ids, parse_resume
+from tests.doubles import PlainTextExtractor
 from tests.resume_fixtures import make_docx, make_pdf, sample_resume_json, sample_sections
 
 
@@ -39,16 +40,16 @@ def test_oversized_file_is_rejected_before_type_check():
         validate_upload(b"%PDF-" + b"x" * 100, max_bytes=50)
 
 
-def test_stub_extractor_reads_both_formats():
-    extractor = StubTextExtractor()
+def test_plain_text_extractor_reads_both_formats():
+    extractor = PlainTextExtractor()
     assert "Priya Nair" in extractor.extract(make_pdf(), FileKind.PDF)
     docx_text = extractor.extract(make_docx(["Line one", "Line two"]), FileKind.DOCX)
     assert docx_text.splitlines() == ["Line one", "Line two"]
 
 
-def test_stub_extractor_rejects_an_empty_document():
+def test_plain_text_extractor_rejects_an_empty_document():
     with pytest.raises(ResumeParseError):
-        StubTextExtractor().extract(b"%PDF-1.4\n   ", FileKind.PDF)
+        PlainTextExtractor().extract(b"%PDF-1.4\n   ", FileKind.PDF)
 
 
 def _llm_returning(content: str | None) -> FakeLLMClient:

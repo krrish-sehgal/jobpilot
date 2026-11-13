@@ -4,7 +4,7 @@ Decoupling scraping from enrichment through a queue lets the two
 scale independently: scrapers burst when a platform's listing pages
 change, while enrichment workers drain at a steady LLM-bound rate.
 `QueueBackend` is the protocol; `InMemoryQueueBackend` is a faithful
-enough fake (visibility timeout, receive-count tracking, redelivery)
+enough test double (visibility timeout, receive-count tracking, redelivery)
 to exercise `jobpilot.ingest.worker` in tests without a real broker.
 """
 
@@ -14,7 +14,9 @@ import time
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import Any, Protocol
+
+from botocore.exceptions import BotoCoreError, ClientError
 
 from jobpilot.config import Settings
 from jobpilot.errors import QueueError
@@ -37,31 +39,70 @@ class QueueBackend(Protocol):
     def queue_depth(self) -> int: ...
 
 
-class HTTPQueueBackend:
-    """Real queue client. Unconfigured until a queue URL is set."""
+class SqsQueueBackend:
+    """Amazon SQS-backed queue.
 
-    def __init__(self, settings: Settings) -> None:
-        self._settings = settings
+    `QueueMessage.id` carries the SQS receipt handle (what `delete`
+    needs), while `send` returns the SQS message id. `receive_count`
+    comes from `ApproximateReceiveCount`; dead-lettering is left to the
+    queue's redrive policy. `boto3` is imported on construction, and a
+    preconfigured client can be passed in instead.
+    """
 
-    def _require_real_config(self) -> None:
-        if self._settings.queue_url.startswith("https://queue.example.com"):
-            raise QueueError("no queue configured (JOBPILOT_QUEUE_URL is still a placeholder)")
+    def __init__(self, settings: Settings, *, client: Any | None = None) -> None:
+        self._queue_url = settings.queue_url
+        self._visibility_timeout = settings.queue_visibility_timeout_seconds
+        if client is None:
+            if settings.queue_url.startswith("https://queue.example.com"):
+                raise QueueError("no queue configured (JOBPILOT_QUEUE_URL is still a placeholder)")
+            import boto3
+
+            client = boto3.client("sqs", region_name=settings.queue_region)
+        self._client = client
 
     def send(self, body: str) -> str:
-        self._require_real_config()
-        raise QueueError("HTTPQueueBackend is not wired to a live queue in this environment")
+        try:
+            response = self._client.send_message(QueueUrl=self._queue_url, MessageBody=body)
+        except (BotoCoreError, ClientError) as exc:
+            raise QueueError(f"could not send message: {exc}") from exc
+        return str(response["MessageId"])
 
     def receive(self, max_messages: int = 1) -> list[QueueMessage]:
-        self._require_real_config()
-        raise QueueError("HTTPQueueBackend is not wired to a live queue in this environment")
+        try:
+            response = self._client.receive_message(
+                QueueUrl=self._queue_url,
+                MaxNumberOfMessages=max(1, min(max_messages, 10)),
+                VisibilityTimeout=self._visibility_timeout,
+                AttributeNames=["ApproximateReceiveCount"],
+                WaitTimeSeconds=0,
+            )
+        except (BotoCoreError, ClientError) as exc:
+            raise QueueError(f"could not receive messages: {exc}") from exc
+        return [
+            QueueMessage(
+                id=raw["ReceiptHandle"],
+                body=raw["Body"],
+                receive_count=int(raw.get("Attributes", {}).get("ApproximateReceiveCount", 1)),
+            )
+            for raw in response.get("Messages", [])
+        ]
 
     def delete(self, message_id: str) -> None:
-        self._require_real_config()
-        raise QueueError("HTTPQueueBackend is not wired to a live queue in this environment")
+        """Delete a received message; `message_id` is its `QueueMessage.id`."""
+
+        try:
+            self._client.delete_message(QueueUrl=self._queue_url, ReceiptHandle=message_id)
+        except (BotoCoreError, ClientError) as exc:
+            raise QueueError(f"could not delete message: {exc}") from exc
 
     def queue_depth(self) -> int:
-        self._require_real_config()
-        raise QueueError("HTTPQueueBackend is not wired to a live queue in this environment")
+        try:
+            response = self._client.get_queue_attributes(
+                QueueUrl=self._queue_url, AttributeNames=["ApproximateNumberOfMessages"]
+            )
+        except (BotoCoreError, ClientError) as exc:
+            raise QueueError(f"could not read queue depth: {exc}") from exc
+        return int(response["Attributes"]["ApproximateNumberOfMessages"])
 
 
 @dataclass
